@@ -63,7 +63,11 @@ class Settings(BaseSettings):
     lockout_duration_minutes: int = int(os.getenv("LOCKOUT_DURATION_MINUTES", "15"))
     
     # CORS
-    allowed_origins: List[str] = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+    # Include production frontend by default; override via ALLOWED_ORIGINS env
+    allowed_origins: List[str] = os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://catadley.vercel.app,http://localhost:3000,http://localhost:5173"
+    ).split(",")
     
     # Logging
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
