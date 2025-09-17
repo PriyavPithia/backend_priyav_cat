@@ -59,7 +59,11 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Security middleware
 if not settings.debug:
-    allowed_hosts = os.getenv("ALLOWED_HOSTS", "*.citizensadvicetadley.org.uk").split(",")
+    # Include Railway and your custom domains. Override via ALLOWED_HOSTS env in prod.
+    allowed_hosts = os.getenv(
+        "ALLOWED_HOSTS",
+        "*.citizensadvicetadley.org.uk,*.up.railway.app,web-production-dd1a.up.railway.app"
+    ).split(",")
     app.add_middleware(
         TrustedHostMiddleware, 
         allowed_hosts=allowed_hosts
