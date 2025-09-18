@@ -39,7 +39,6 @@ def init_database():
                 contact_phone="0118 981 7567",
                 address="Citizens Advice Tadley\nTurbary Building\nFranklin Avenue\nTadley\nRG26 4ET",
                 is_active=True,
-                allow_open_registration=False,  # Invitation-only
                 privacy_statement_url="https://citizensadvicetadley.org.uk/privacy",
                 terms_url="https://citizensadvicetadley.org.uk/terms"
             )
