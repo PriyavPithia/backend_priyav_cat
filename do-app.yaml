@@ -15,7 +15,7 @@ services:
       path: /api/health
       initial_delay_seconds: 5
     routes:
-      - path: /
+      - path: /api
     envs:
       - key: DEBUG
         value: "false"
