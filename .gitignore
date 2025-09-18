@@ -32,6 +32,9 @@ MANIFEST
 *.sqlite
 *.sqlite3
 
+# Allow this one SQLite file for migration purposes
+!ca_tadley_debt_tool.db
+
 # Environment variables
 .env
 .env.local
@@ -121,7 +124,6 @@ env.production.example
 .DS_Store
 logs/
 uploads/
-ca_tadley_debt_tool.db
 *.sqlite
 .pytest_cache/
 .coverage
