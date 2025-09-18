@@ -1,0 +1,38 @@
+name: ca-tadley-debt-tool
+services:
+  - name: api
+    environment_slug: python
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    github:
+      repo: REPLACE_WITH_SATTVA_DEV_ORG/REPO_NAME
+      branch: main
+      deploy_on_push: true
+    build_command: pip install -r requirements.txt
+    run_command: python -m uvicorn src.main:app --host 0.0.0.0 --port 
+    http_port: 8080
+    health_check:
+      path: /api/health
+      initial_delay_seconds: 5
+    routes:
+      - path: /
+    envs:
+      - key: DEBUG
+        value: "false"
+        scope: RUN_TIME
+      - key: SECRET_KEY
+        value: "" # set in DO dashboard
+        scope: RUN_TIME
+      - key: DATABASE_URL
+        value: "" # e.g. postgres://... (DO Managed DB)
+        scope: RUN_TIME
+      - key: ALLOWED_HOSTS
+        value: "*.ondigitalocean.app"
+        scope: RUN_TIME
+      - key: UPLOAD_DIR
+        value: "/app/uploads"
+        scope: RUN_TIME
+    jobs:
+      - name: migrate
+        kind: PRE_DEPLOY
+        run_command: python run_migrations.py
