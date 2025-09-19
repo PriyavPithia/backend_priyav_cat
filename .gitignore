@@ -4,6 +4,7 @@ env/
 ENV/
 .venv/
 
+.ca_tadley_debt_tool.db
 # Python
 __pycache__/
 *.py[cod]
