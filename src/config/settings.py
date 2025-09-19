@@ -74,10 +74,12 @@ class Settings(BaseSettings):
     
     # CORS
     # Include production frontend by default; override via ALLOWED_ORIGINS env
-    allowed_origins: List[str] = os.getenv(
-        "ALLOWED_ORIGINS",
-        "http://localhost:3000,http://localhost:5173"
-    ).split(",")
+    @property
+    def allowed_origins(self) -> List[str]:
+        origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173")
+        # Remove any quotes and brackets that might have been added
+        origins = origins.strip('[]"\' ')
+        return [origin.strip() for origin in origins.split(",") if origin.strip()]
     
     # Logging
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
