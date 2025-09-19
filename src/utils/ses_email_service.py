@@ -330,9 +330,9 @@ async def send_password_reset_email(email: str, reset_token: str, user_name: str
         tags={'type': 'password_reset'}
     )
 
-async def send_invitation_email(email: str, invitation_token: str, inviter_name: str = "", invitation_url: str = None, additional_context: dict = None) -> bool:
+async def send_invitation_email(email: str, invitation_token: str, inviter_name: str = "", invitation_url: str = None, ca_office: str = "Citizens Advice Tadley", ca_client_number: str = "") -> bool:
     """Send user invitation email using professional template"""
-    subject = "Invitation to CA Tadley Debt Advice Tool"
+    subject = "Client Invitation - Citizens Advice Tadley"
     
     # Create invitation URL if not provided
     if not invitation_url:
@@ -342,7 +342,7 @@ async def send_invitation_email(email: str, invitation_token: str, inviter_name:
         invitation_url = f"{settings.allowed_origins[0]}{invitation_url}"
     
     # Render HTML template
-    html_body = render_invitation_email(inviter_name, invitation_url, additional_context)
+    html_body = render_invitation_email(inviter_name, invitation_url, ca_office, ca_client_number)
     
     # Fallback to simple template if rendering fails
     if not html_body:

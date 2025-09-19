@@ -98,6 +98,8 @@ class EmailTemplateEngine:
         self,
         inviter_name: str,
         invitation_url: str,
+        ca_office: str = "Citizens Advice Tadley",
+        ca_client_number: str = "",
         additional_context: Optional[Dict[str, Any]] = None
     ) -> Optional[str]:
         """Render invitation email template"""
@@ -105,9 +107,8 @@ class EmailTemplateEngine:
         context = {
             'inviter_name': inviter_name,
             'invitation_url': invitation_url,
-            'registration_link': invitation_url,  # Alias for template compatibility
-            'ca_office': additional_context.get('ca_office', 'CA Tadley') if additional_context else 'CA Tadley',
-            'ca_client_number': additional_context.get('ca_client_number', 'TBD') if additional_context else 'TBD',
+            'ca_office': ca_office,
+            'ca_client_number': ca_client_number,
             'current_year': datetime.now().year,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
         }
@@ -205,9 +206,9 @@ def render_password_reset_email(user_name: str, reset_url: str, **kwargs) -> Opt
     """Convenience function to render password reset email"""
     return template_engine.render_password_reset_email(user_name, reset_url, kwargs)
 
-def render_invitation_email(inviter_name: str, invitation_url: str, **kwargs) -> Optional[str]:
+def render_invitation_email(inviter_name: str, invitation_url: str, ca_office: str = "Citizens Advice Tadley", ca_client_number: str = "", **kwargs) -> Optional[str]:
     """Convenience function to render invitation email"""
-    return template_engine.render_invitation_email(inviter_name, invitation_url, kwargs)
+    return template_engine.render_invitation_email(inviter_name, invitation_url, ca_office, ca_client_number, kwargs)
 
 def render_2fa_code_email(user_name: str, code: str, **kwargs) -> Optional[str]:
     """Convenience function to render 2FA code email"""

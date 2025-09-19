@@ -1234,11 +1234,23 @@ async def create_user(
         
         # Send welcome email with password setup instructions
         user_name = f"{new_user.first_name} {new_user.last_name}".strip() or "User"
+        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
         
-        email_sent = await send_password_reset_email(
+        # Get office name for the email
+        office = db.query(Office).filter(Office.id == office_id).first()
+        office_name = office.name if office else "Citizens Advice Tadley"
+        client_number = ca_client_number or "TBD"
+        
+        # Create invitation URL for new user to set up their account
+        invite_url = f"/register?token={reset_token}"
+        
+        email_sent = await send_invitation_email(
             new_user.email, 
             reset_token, 
-            user_name
+            inviter_name,
+            invite_url,
+            office_name,
+            client_number
         )
         
         if not email_sent:
@@ -1363,18 +1375,11 @@ async def invite_user(
     # Send invitation email
     try:
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
-        # Prepare additional context for invitation email
-        additional_context = {
-            'ca_office': office.name if office else 'CA Tadley',
-            'ca_client_number': ca_client_number or 'TBD'
-        }
-        
         email_sent = await send_invitation_email(
             request.email, 
             invitation_token, 
             inviter_name,
-            invite_url,
-            additional_context
+            invite_url
         )
         
         if not email_sent:
@@ -1454,18 +1459,11 @@ async def invite_adviser(
     # Send invitation email
     try:
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
-        # Prepare additional context for invitation email
-        additional_context = {
-            'ca_office': office.name if office else 'CA Tadley',
-            'ca_client_number': ca_client_number or 'TBD'
-        }
-        
         email_sent = await send_invitation_email(
             request.email, 
             invitation_token, 
             inviter_name,
-            invite_url,
-            additional_context
+            invite_url
         )
         
         if not email_sent:
