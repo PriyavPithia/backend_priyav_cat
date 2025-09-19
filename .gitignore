@@ -32,9 +32,6 @@ MANIFEST
 *.sqlite
 *.sqlite3
 
-# Allow this one SQLite file for migration purposes
-!ca_tadley_debt_tool.db
-
 # Environment variables
 .env
 .env.local

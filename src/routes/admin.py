@@ -13,7 +13,7 @@ import logging
 from ..config.database import get_db
 from ..models import User, Case, Office, UserRole, UserStatus, CaseStatus, CasePriority, AuditLog, Notification, NotificationType, Debt, Asset, Income, Expenditure, FileUpload, ClientDetails
 from .auth import get_current_user, TokenResponse, UserResponse
-from ..utils.auth import hash_password, get_lockout_remaining_time, get_client_ip_address, generate_reset_token
+from ..utils.auth import hash_password, get_lockout_remaining_time, get_client_ip_address, generate_reset_token, generate_invitation_token
 from ..utils.ses_email_service import send_password_reset_email, send_invitation_email
 
 router = APIRouter()
@@ -1146,6 +1146,33 @@ async def create_user(
             from .auth import generate_next_client_number
             ca_client_number = generate_next_client_number(db)
     
+    # Generate invitation token for the new user
+    invitation_token = generate_invitation_token()
+    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 days expiry
+    
+    # Prepare invitation details for prefilling
+    invitation_details = {}
+    if request.first_name:
+        invitation_details['first_name'] = request.first_name
+    if request.last_name:
+        invitation_details['last_name'] = request.last_name
+    if request.phone:
+        invitation_details['phone'] = request.phone
+    if request.title:
+        invitation_details['title'] = request.title
+    if request.home_address:
+        invitation_details['home_address'] = request.home_address
+    if request.postcode:
+        invitation_details['postcode'] = request.postcode
+    if request.date_of_birth:
+        invitation_details['date_of_birth'] = request.date_of_birth
+    if request.gender:
+        invitation_details['gender'] = request.gender
+    if request.home_phone:
+        invitation_details['home_phone'] = request.home_phone
+    if request.mobile_phone:
+        invitation_details['mobile_phone'] = request.mobile_phone
+
     # Create new user
     new_user = User(
         email=request.email,
@@ -1156,8 +1183,12 @@ async def create_user(
         ca_client_number=ca_client_number,
         phone=request.phone,
         is_office_admin=request.is_office_admin,
-        status=UserStatus.ACTIVE,
-        password_hash=hash_password("TemporaryPassword123!"),  # TODO: Send password reset email
+        status=UserStatus.PENDING_VERIFICATION,
+        password_hash=hash_password("TemporaryPassword123!"),
+        invitation_token=invitation_token,
+        invitation_expires_at=expires_at,
+        invited_by_id=current_user.id,
+        invitation_details=json.dumps(invitation_details) if invitation_details else None,
         # Contact details - save directly to User model
         title=request.title,
         home_phone=request.home_phone,
@@ -1225,28 +1256,24 @@ async def create_user(
         db.add(client_details)
         db.commit()
     
-    # Generate password reset token and send welcome email
+    # Send invitation email
     try:
-        reset_token = generate_reset_token()
-        new_user.reset_token = reset_token
-        new_user.reset_token_expires = datetime.utcnow() + timedelta(hours=24)
-        db.commit()
-        
         # Send welcome email with password setup instructions
         user_name = f"{new_user.first_name} {new_user.last_name}".strip() or "User"
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
         
-        # Get office name for the email
+        # Get office name and code for the email
         office = db.query(Office).filter(Office.id == office_id).first()
         office_name = office.name if office else "Citizens Advice Tadley"
+        office_code = office.code if office else "DEFAULT"
         client_number = ca_client_number or "TBD"
         
-        # Create invitation URL for new user to set up their account
-        invite_url = f"/register?token={reset_token}"
+        # Create invitation URL with office code and invitation token
+        invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
         
         email_sent = await send_invitation_email(
             new_user.email, 
-            reset_token, 
+            invitation_token, 
             inviter_name,
             invite_url,
             office_name,
