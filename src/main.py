@@ -75,8 +75,9 @@ app.add_middleware(
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-    expose_headers=["Content-Type", "Authorization"]
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"],
+    expose_headers=["Content-Type", "Authorization"],
+    max_age=3600
 )
 
 # Security headers middleware
@@ -108,7 +109,7 @@ async def add_security_headers(request: Request, call_next):
             "style-src 'self'; "  # Remove unsafe-inline
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://catadley-hhz5h.ondigitalocean.app; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
             "form-action 'self'; "
