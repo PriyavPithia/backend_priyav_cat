@@ -39,9 +39,9 @@ class AdminCaseResponse(BaseModel):
     total_assets: Optional[str]
     total_income: Optional[str]
     total_expenditure: Optional[str]
-    created_at: datetime
-    updated_at: datetime
-    last_activity: Optional[datetime]
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    last_activity: Optional[dt.datetime]
     notes: Optional[str]
 
 class DetailedDebtResponse(BaseModel):
@@ -55,7 +55,7 @@ class DetailedDebtResponse(BaseModel):
     benefit_type: Optional[str]
     fine_reason: Optional[str]
     is_priority_debt: bool
-    created_at: datetime
+    created_at: dt.datetime
 
 class DetailedAssetResponse(BaseModel):
     id: str
@@ -68,7 +68,7 @@ class DetailedAssetResponse(BaseModel):
     vehicle_registration: Optional[str]
     savings_institution: Optional[str]
     additional_info: Optional[str]
-    created_at: datetime
+    created_at: dt.datetime
 
 class DetailedIncomeResponse(BaseModel):
     id: str
@@ -80,7 +80,7 @@ class DetailedIncomeResponse(BaseModel):
     source_description: Optional[str]
     is_regular_amount: Optional[str]
     additional_info: Optional[str]
-    created_at: datetime
+    created_at: dt.datetime
 
 class DetailedExpenditureResponse(BaseModel):
     id: str
@@ -90,7 +90,7 @@ class DetailedExpenditureResponse(BaseModel):
     frequency: Optional[str]
     provider_name: Optional[str]
     additional_info: Optional[str]
-    created_at: datetime
+    created_at: dt.datetime
 
 class FileUploadResponse(BaseModel):
     id: str
@@ -104,7 +104,7 @@ class FileUploadResponse(BaseModel):
     description: Optional[str]
     is_image: bool
     is_document: bool
-    created_at: datetime
+    created_at: dt.datetime
     was_converted: Optional[bool] = False
     uploaded_by_id: str
 
@@ -179,7 +179,7 @@ class InviteAdviserRequest(BaseModel):
 
 class InviteLinkResponse(BaseModel):
     invite_url: str
-    expires_at: datetime
+    expires_at: dt.datetime
     email: str
 
 class AcceptInvitationRequest(BaseModel):
