@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, text
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
-from datetime import datetime, timedelta
+import datetime as dt
 import secrets
 import string
 import json
@@ -280,8 +280,8 @@ async def list_cases(
             total_assets=getattr(case, 'total_assets_value', None),
             total_income=getattr(case, 'total_monthly_income', None),
             total_expenditure=getattr(case, 'total_monthly_expenditure', None),
-            created_at=getattr(case, 'created_at', datetime.utcnow()),
-            updated_at=getattr(case, 'updated_at', getattr(case, 'created_at', datetime.utcnow())),
+            created_at=getattr(case, 'created_at', dt.datetime.utcnow()),
+            updated_at=getattr(case, 'updated_at', getattr(case, 'created_at', dt.datetime.utcnow())),
             last_activity=getattr(case, 'updated_at', None),
             notes=getattr(case, 'additional_notes', None)
         ))
@@ -387,8 +387,8 @@ async def get_case_details(
             total_assets=getattr(case, 'total_assets_value', None),
             total_income=getattr(case, 'total_monthly_income', None),
             total_expenditure=getattr(case, 'total_monthly_expenditure', None),
-            created_at=getattr(case, 'created_at', datetime.utcnow()),
-            updated_at=getattr(case, 'updated_at', getattr(case, 'created_at', datetime.utcnow())),
+            created_at=getattr(case, 'created_at', dt.datetime.utcnow()),
+            updated_at=getattr(case, 'updated_at', getattr(case, 'created_at', dt.datetime.utcnow())),
             last_activity=getattr(case, 'updated_at', None),
             notes=getattr(case, 'additional_notes', None)
         )
@@ -1148,7 +1148,7 @@ async def create_user(
     
     # Generate invitation token for the new user
     invitation_token = generate_invitation_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 days expiry
+    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)  # 7 days expiry
     
     # Prepare invitation details for prefilling
     invitation_details = {}
@@ -1228,16 +1228,15 @@ async def create_user(
         from ..models.client_details import ClientDetails
 
         # Convert date string to date object if provided
-        from datetime import datetime, date
         date_of_birth = None
         if request.date_of_birth:
             try:
-                date_of_birth = datetime.strptime(request.date_of_birth, "%Y-%m-%d").date()
+                date_of_birth = dt.datetime.strptime(request.date_of_birth, "%Y-%m-%d").date()
             except ValueError:
                 # If date parsing fails, use default
-                date_of_birth = date(1900, 1, 1)
+                date_of_birth = dt.date(1900, 1, 1)
         else:
-            date_of_birth = date(1900, 1, 1)
+            date_of_birth = dt.date(1900, 1, 1)
 
         client_details = ClientDetails(
             user_id=new_user.id,
@@ -1321,7 +1320,7 @@ async def invite_user(
     
     # Generate invitation token
     invitation_token = generate_invitation_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 days expiry
+    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)  # 7 days expiry
     
     # Prepare invitation details for prefilling
     invitation_details = {}
@@ -1443,7 +1442,7 @@ async def invite_adviser(
     
     # Generate invitation token
     invitation_token = generate_invitation_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 days expiry
+    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)  # 7 days expiry
     
     # Create the user with pending status and a temporary password
     temp_password = secrets.token_urlsafe(16)  # Generate a secure temporary password
@@ -1535,7 +1534,7 @@ async def reinvite_user(
 
     # Generate new token and expiry
     invitation_token = generate_invitation_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)
 
     user.invitation_token = invitation_token
     user.invitation_expires_at = expires_at
@@ -1596,7 +1595,7 @@ async def generate_invite_for_user(
 
     # Generate new token and expiry
     invitation_token = generate_invitation_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)
 
     # Prepare invitation details from user's existing data
     invitation_details = {}
@@ -1663,7 +1662,7 @@ async def validate_invitation(
             detail="Invalid or expired invitation link"
         )
     
-    if user.invitation_expires_at < datetime.utcnow():
+    if user.invitation_expires_at < dt.datetime.utcnow():
         # Invitation expired
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1729,7 +1728,7 @@ async def accept_invitation(
             detail="Invalid or expired invitation link"
         )
     
-    if user.invitation_expires_at < datetime.utcnow():
+    if user.invitation_expires_at < dt.datetime.utcnow():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invitation link has expired"
@@ -1759,11 +1758,11 @@ async def accept_invitation(
     user.invitation_token = None
     user.invitation_expires_at = None
     user.email_verified = True
-    user.email_verified_at = datetime.utcnow()
+    user.email_verified_at = dt.datetime.utcnow()
     
     # Update last_login and last_activity since this is effectively a login
-    user.last_login = datetime.utcnow()
-    user.last_activity = datetime.utcnow()
+    user.last_login = dt.datetime.utcnow()
+    user.last_activity = dt.datetime.utcnow()
     
     db.commit()
     
@@ -2488,7 +2487,7 @@ async def get_authentication_logs(
     
     if start_date:
         try:
-            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            start_dt = dt.datetime.fromisoformat(start_date.replace('Z', '+00:00'))
             query = query.filter(AuditLog.created_at >= start_dt)
         except ValueError:
             raise HTTPException(
@@ -2498,7 +2497,7 @@ async def get_authentication_logs(
     
     if end_date:
         try:
-            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            end_dt = dt.datetime.fromisoformat(end_date.replace('Z', '+00:00'))
             query = query.filter(AuditLog.created_at <= end_dt)
         except ValueError:
             raise HTTPException(
