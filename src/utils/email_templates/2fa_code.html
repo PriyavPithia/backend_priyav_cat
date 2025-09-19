@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2FA Verification Code - CA Tadley</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #6f42c1 0%, #5a2d91 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .code-container {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 3px dashed #6f42c1;
+            padding: 30px 20px;
+            border-radius: 15px;
+            margin: 30px 0;
+            position: relative;
+        }
+        .verification-code {
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            color: #6f42c1;
+            font-family: 'Courier New', monospace;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .code-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .urgency-notice {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .security-notice {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+            border-top: 1px solid #dee2e6;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        .timer-icon {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background-color: #ffc107;
+            color: #333;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            .header, .content {
+                padding: 20px 15px;
+            }
+            .verification-code {
+                font-size: 28px;
+                letter-spacing: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">🔐</div>
+            <h1>2FA Verification Code</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">CA Tadley Debt Advice Tool</p>
+        </div>
+        
+        <div class="content">
+            <h2 style="color: #6f42c1; margin-bottom: 10px;">Hello {{user_name}},</h2>
+            <p>Here is your two-factor authentication verification code:</p>
+            
+            <div class="code-container">
+                <div class="timer-icon">⏱</div>
+                <div class="code-label">Your 2FA Code</div>
+                <div class="verification-code">{{code}}</div>
+            </div>
+            
+            <div class="urgency-notice">
+                <strong>⏰ Time Sensitive:</strong> This verification code will expire in <strong>10 minutes</strong>. Please use it immediately to complete your login.
+            </div>
+            
+            <h3>How to Use This Code:</h3>
+            <ol style="text-align: left; max-width: 400px; margin: 0 auto;">
+                <li>Return to the login page on your device</li>
+                <li>Enter this 6-digit code in the 2FA field</li>
+                <li>Click "Verify" to complete your login</li>
+            </ol>
+            
+            <div class="security-notice">
+                <strong>🛡️ Security Alert:</strong> If you did not request this verification code, someone may be trying to access your account. Please:
+                <ul style="text-align: left; margin: 10px 0 0 0;">
+                    <li>Do not share this code with anyone</li>
+                    <li>Contact your administrator immediately</li>
+                    <li>Consider changing your password</li>
+                </ul>
+            </div>
+            
+            <p style="font-size: 14px; color: #6c757d; margin-top: 30px;">
+                This code was requested from:<br>
+                <strong>CA Tadley Debt Advice Tool</strong><br>
+                Time: {{timestamp}}<br>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>This verification code was sent from the CA Tadley security system.</p>
+            <p><strong>Never share your 2FA codes with anyone!</strong></p>
+            <p style="margin-top: 15px; font-size: 10px; opacity: 0.7;">
+                © 2024 Citizens Advice Tadley. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

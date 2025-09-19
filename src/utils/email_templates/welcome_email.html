@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to CA Tadley Debt Advice Tool</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #333333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c5aa0 0%, #1e3d72 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .welcome-message {
+            background-color: #e8f4f8;
+            border-left: 4px solid #2c5aa0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #28a745 0%, #20853a 100%);
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 20px 0;
+            box-shadow: 0 3px 6px rgba(40, 167, 69, 0.3);
+            transition: transform 0.2s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(40, 167, 69, 0.4);
+        }
+        .info-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+            border-top: 1px solid #dee2e6;
+        }
+        .link-box {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            word-break: break-all;
+            font-family: monospace;
+            margin: 15px 0;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            .header, .content {
+                padding: 20px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Welcome to CA Tadley</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Debt Advice Tool</p>
+        </div>
+        
+        <div class="content">
+            <div class="welcome-message">
+                <h2 style="margin-top: 0; color: #2c5aa0;">Welcome, {{user_name}}!</h2>
+                <p>Your account has been successfully created for the CA Tadley Debt Advice Tool. You can now access our secure platform to manage debt advice cases and client information.</p>
+            </div>
+            
+            <h3>Next Steps:</h3>
+            <ol>
+                <li><strong>Set up your password:</strong> Click the button below to create your secure password</li>
+                <li><strong>Complete your profile:</strong> Add any additional information to your profile</li>
+                <li><strong>Explore the platform:</strong> Familiarize yourself with the tools and features available</li>
+            </ol>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{reset_url}}" class="cta-button">Set Up Your Password</a>
+            </div>
+            
+            <div class="info-box">
+                <strong>⏰ Important:</strong> This password setup link will expire in 24 hours. If you don't set up your password within this time, please contact your administrator for a new invitation.
+            </div>
+            
+            <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
+            <div class="link-box">{{reset_url}}</div>
+            
+            <h3>Need Help?</h3>
+            <p>If you have any questions or need assistance getting started, please don't hesitate to contact our support team or your administrator.</p>
+            
+            <p>We're excited to have you on board!</p>
+            
+            <p style="margin-top: 30px;">
+                Best regards,<br>
+                <strong>The CA Tadley Team</strong>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>This email was sent from the CA Tadley Debt Advice Tool.</p>
+            <p>Please do not reply to this email. For support, contact your administrator.</p>
+            <p style="margin-top: 15px; font-size: 10px; opacity: 0.7;">
+                © 2024 Citizens Advice Tadley. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

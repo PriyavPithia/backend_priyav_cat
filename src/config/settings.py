@@ -43,12 +43,22 @@ class Settings(BaseSettings):
     heic_use_jpeg: bool = True  # Use JPEG for speed (True) or PNG for quality (False)
     
     # Email (for 2FA and notifications)
+    # SMTP Configuration (legacy)
     smtp_server: Optional[str] = os.getenv("SMTP_SERVER")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
     smtp_username: Optional[str] = os.getenv("SMTP_USERNAME")
     smtp_password: Optional[str] = os.getenv("SMTP_PASSWORD")
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     from_email: str = os.getenv("FROM_EMAIL", "noreply@citizensadvicetadley.org.uk")
+    
+    # AWS SES Configuration
+    aws_access_key_id: Optional[str] = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: Optional[str] = os.getenv("AWS_SECRET_ACCESS_KEY")
+    aws_region: str = os.getenv("AWS_REGION", "eu-west-2")  # Default to London region
+    ses_from_email: str = os.getenv("SES_FROM_EMAIL", "noreply@citizensadvicetadley.org.uk")
+    ses_reply_to_email: Optional[str] = os.getenv("SES_REPLY_TO_EMAIL")
+    use_ses: bool = os.getenv("USE_SES", "false").lower() == "true"
+    ses_configuration_set: Optional[str] = os.getenv("SES_CONFIGURATION_SET")  # For tracking
     
     # Security Settings
     auto_logout_minutes: int = int(os.getenv("AUTO_LOGOUT_MINUTES", "30"))

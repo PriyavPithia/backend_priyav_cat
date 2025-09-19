@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 from datetime import datetime, timedelta
 import secrets
+import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 # CSRF protection removed due to compatibility issues
@@ -25,9 +26,11 @@ from ..utils.auth import (
     is_session_expired, get_session_remaining_time, get_session_warning_threshold,
     get_client_ip_address
 )
+from ..utils.ses_email_service import send_password_reset_email, send_2fa_code_email
 
 router = APIRouter()
 security = HTTPBearer()
+logger = logging.getLogger(__name__)
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -982,8 +985,14 @@ async def request_password_reset(
         
         db.commit()
         
-        # In a full implementation, send email with reset link
-        # send_password_reset_email(user.email, reset_token)
+        # Send password reset email
+        try:
+            user_name = f"{user.first_name} {user.last_name}".strip() or "User"
+            email_sent = await send_password_reset_email(user.email, reset_token, user_name)
+            if not email_sent:
+                logger.warning(f"Failed to send password reset email to {user.email}")
+        except Exception as e:
+            logger.error(f"Error sending password reset email: {str(e)}")
     
     return {"message": "If the email exists, a password reset link has been sent"}
 

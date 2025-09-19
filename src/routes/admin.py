@@ -8,13 +8,16 @@ import secrets
 import string
 import json
 import os
+import logging
 
 from ..config.database import get_db
 from ..models import User, Case, Office, UserRole, UserStatus, CaseStatus, CasePriority, AuditLog, Notification, NotificationType, Debt, Asset, Income, Expenditure, FileUpload, ClientDetails
 from .auth import get_current_user, TokenResponse, UserResponse
-from ..utils.auth import hash_password, get_lockout_remaining_time, get_client_ip_address
+from ..utils.auth import hash_password, get_lockout_remaining_time, get_client_ip_address, generate_reset_token
+from ..utils.ses_email_service import send_password_reset_email, send_invitation_email
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 class AdminCaseResponse(BaseModel):
     id: str
@@ -1221,6 +1224,30 @@ async def create_user(
         
         db.add(client_details)
         db.commit()
+    
+    # Generate password reset token and send welcome email
+    try:
+        reset_token = generate_reset_token()
+        new_user.reset_token = reset_token
+        new_user.reset_token_expires = datetime.utcnow() + timedelta(hours=24)
+        db.commit()
+        
+        # Send welcome email with password setup instructions
+        user_name = f"{new_user.first_name} {new_user.last_name}".strip() or "User"
+        
+        email_sent = await send_password_reset_email(
+            new_user.email, 
+            reset_token, 
+            user_name
+        )
+        
+        if not email_sent:
+            logger.warning(f"Failed to send welcome email to {new_user.email}")
+        else:
+            logger.info(f"Welcome email sent to {new_user.email}")
+            
+    except Exception as e:
+        logger.error(f"Error sending welcome email: {str(e)}")
     
     return {
         "message": f"User {request.email} created successfully",
