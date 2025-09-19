@@ -1360,6 +1360,24 @@ async def invite_user(
     # Generate invite URL with office code
     invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
     
+    # Send invitation email
+    try:
+        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
+        email_sent = await send_invitation_email(
+            request.email, 
+            invitation_token, 
+            inviter_name,
+            invite_url
+        )
+        
+        if not email_sent:
+            logger.warning(f"Failed to send invitation email to {request.email}")
+        else:
+            logger.info(f"Invitation email sent to {request.email}")
+            
+    except Exception as e:
+        logger.error(f"Error sending invitation email: {str(e)}")
+    
     return InviteLinkResponse(
         invite_url=invite_url,
         expires_at=expires_at,
@@ -1426,6 +1444,24 @@ async def invite_adviser(
     # Generate invite URL with office code
     invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
     
+    # Send invitation email
+    try:
+        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
+        email_sent = await send_invitation_email(
+            request.email, 
+            invitation_token, 
+            inviter_name,
+            invite_url
+        )
+        
+        if not email_sent:
+            logger.warning(f"Failed to send invitation email to {request.email}")
+        else:
+            logger.info(f"Invitation email sent to {request.email}")
+            
+    except Exception as e:
+        logger.error(f"Error sending invitation email: {str(e)}")
+    
     return InviteLinkResponse(
         invite_url=invite_url,
         expires_at=expires_at,
@@ -1476,6 +1512,24 @@ async def reinvite_user(
     
     # Generate invite URL with office code
     invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
+
+    # Send reinvitation email
+    try:
+        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
+        email_sent = await send_invitation_email(
+            user.email, 
+            invitation_token, 
+            inviter_name,
+            invite_url
+        )
+        
+        if not email_sent:
+            logger.warning(f"Failed to send reinvitation email to {user.email}")
+        else:
+            logger.info(f"Reinvitation email sent to {user.email}")
+            
+    except Exception as e:
+        logger.error(f"Error sending reinvitation email: {str(e)}")
 
     return InviteLinkResponse(
         invite_url=invite_url,
