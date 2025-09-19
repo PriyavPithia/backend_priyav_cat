@@ -1268,7 +1268,7 @@ async def create_user(
         client_number = ca_client_number or "TBD"
         
         # Create invitation URL with office code and invitation token
-        invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
+        invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
         
         email_sent = await send_invitation_email(
             new_user.email, 
@@ -1396,7 +1396,7 @@ async def invite_user(
     office_code = office.code if office else "DEFAULT"
     
     # Generate invite URL with office code
-    invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
+    invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
     
     # Send invitation email
     try:
@@ -1480,7 +1480,7 @@ async def invite_adviser(
     office_code = office.code if office else "DEFAULT"
     
     # Generate invite URL with office code
-    invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
+    invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
     
     # Send invitation email
     try:
@@ -1549,7 +1549,7 @@ async def reinvite_user(
     office_code = office.code if office else "DEFAULT"
     
     # Generate invite URL with office code
-    invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
+    invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
 
     # Send reinvitation email
     try:
@@ -1635,7 +1635,7 @@ async def generate_invite_for_user(
     office_code = office.code if office else "DEFAULT"
     
     # Generate invite URL with office code
-    invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
+    invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
 
     return InviteLinkResponse(
         invite_url=invite_url,
