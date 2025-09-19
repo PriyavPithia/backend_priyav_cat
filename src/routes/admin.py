@@ -1363,11 +1363,18 @@ async def invite_user(
     # Send invitation email
     try:
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
+        # Prepare additional context for invitation email
+        additional_context = {
+            'ca_office': office.name if office else 'CA Tadley',
+            'ca_client_number': ca_client_number or 'TBD'
+        }
+        
         email_sent = await send_invitation_email(
             request.email, 
             invitation_token, 
             inviter_name,
-            invite_url
+            invite_url,
+            additional_context
         )
         
         if not email_sent:
@@ -1447,11 +1454,18 @@ async def invite_adviser(
     # Send invitation email
     try:
         inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
+        # Prepare additional context for invitation email
+        additional_context = {
+            'ca_office': office.name if office else 'CA Tadley',
+            'ca_client_number': ca_client_number or 'TBD'
+        }
+        
         email_sent = await send_invitation_email(
             request.email, 
             invitation_token, 
             inviter_name,
-            invite_url
+            invite_url,
+            additional_context
         )
         
         if not email_sent:

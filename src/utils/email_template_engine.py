@@ -105,6 +105,9 @@ class EmailTemplateEngine:
         context = {
             'inviter_name': inviter_name,
             'invitation_url': invitation_url,
+            'registration_link': invitation_url,  # Alias for template compatibility
+            'ca_office': additional_context.get('ca_office', 'CA Tadley') if additional_context else 'CA Tadley',
+            'ca_client_number': additional_context.get('ca_client_number', 'TBD') if additional_context else 'TBD',
             'current_year': datetime.now().year,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
         }

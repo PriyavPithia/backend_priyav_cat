@@ -3,181 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>You're Invited - CA Tadley Debt Advice Tool</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
-            color: #333333;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 600px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #28a745 0%, #20853a 100%);
-            color: white;
-            padding: 30px 20px;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-        }
-        .content {
-            padding: 30px 20px;
-        }
-        .invitation-card {
-            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
-            border: 1px solid #c3e6cb;
-            border-left: 4px solid #28a745;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 0 10px 10px 0;
-            text-align: center;
-        }
-        .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #28a745 0%, #20853a 100%);
-            color: white;
-            padding: 15px 35px;
-            text-decoration: none;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 16px;
-            margin: 20px 0;
-            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
-            transition: transform 0.2s ease;
-        }
-        .cta-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(40, 167, 69, 0.4);
-        }
-        .info-box {
-            background-color: #d1ecf1;
-            border: 1px solid #bee5eb;
-            border-left: 4px solid #17a2b8;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 0 5px 5px 0;
-        }
-        .footer {
-            background-color: #f8f9fa;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #6c757d;
-            border-top: 1px solid #dee2e6;
-        }
-        .link-box {
-            background-color: #f5f5f5;
-            padding: 15px;
-            border-radius: 5px;
-            word-break: break-all;
-            font-family: monospace;
-            margin: 15px 0;
-        }
-        .features-list {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        .features-list ul {
-            margin: 0;
-            padding-left: 20px;
-        }
-        .features-list li {
-            margin: 8px 0;
-        }
-        .icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
-        @media (max-width: 600px) {
-            .container {
-                margin: 10px;
-                border-radius: 5px;
-            }
-            .header, .content {
-                padding: 20px 15px;
-            }
-        }
-    </style>
+    <title>Client Invitation - Citizens Advice Tadley</title>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="icon">🎉</div>
-            <h1>You're Invited!</h1>
-            <p style="margin: 10px 0 0 0; opacity: 0.9;">Join the CA Tadley Debt Advice Tool</p>
-        </div>
-        
-        <div class="content">
-            <div class="invitation-card">
-                <h2 style="margin-top: 0; color: #155724;">Welcome to Our Team!</h2>
-                <p style="font-size: 16px; margin-bottom: 0;">{{inviter_name}} has invited you to join the CA Tadley Debt Advice Tool platform.</p>
-            </div>
-            
-            <h3>What is the CA Tadley Debt Advice Tool?</h3>
-            <p>Our secure platform helps debt advisers manage client cases, track progress, and provide comprehensive debt advice services. You'll have access to professional tools designed specifically for debt advice professionals.</p>
-            
-            <div class="features-list">
-                <h4 style="margin-top: 0; color: #2c5aa0;">Platform Features:</h4>
-                <ul>
-                    <li>📋 Comprehensive case management system</li>
-                    <li>👥 Secure client information storage</li>
-                    <li>📊 Financial assessment tools</li>
-                    <li>📁 Document upload and management</li>
-                    <li>🔒 Bank-level security and encryption</li>
-                    <li>📱 Mobile-responsive design</li>
-                </ul>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{{invitation_url}}" class="cta-button">Accept Invitation & Sign Up</a>
-            </div>
-            
-            <div class="info-box">
-                <strong>⏰ Time Limit:</strong> This invitation will expire in 7 days. Please accept your invitation and complete your registration before then.
-            </div>
-            
-            <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
-            <div class="link-box">{{invitation_url}}</div>
-            
-            <h3>Getting Started:</h3>
-            <ol>
-                <li><strong>Accept this invitation</strong> by clicking the button above</li>
-                <li><strong>Complete your registration</strong> with your personal details</li>
-                <li><strong>Set up your secure password</strong> following our security guidelines</li>
-                <li><strong>Explore the platform</strong> and familiarize yourself with the tools</li>
-                <li><strong>Contact your administrator</strong> if you need any assistance</li>
-            </ol>
-            
-            <p>We're excited to have you join our team and look forward to working with you!</p>
-            
-            <p style="margin-top: 30px;">
-                Best regards,<br>
-                <strong>{{inviter_name}}</strong><br>
-                <em>CA Tadley Team</em>
-            </p>
-        </div>
-        
-        <div class="footer">
-            <p>This invitation was sent from the CA Tadley Debt Advice Tool.</p>
-            <p>If you believe you received this invitation in error, please contact the sender.</p>
-            <p style="margin-top: 15px; font-size: 10px; opacity: 0.7;">
-                © 2024 Citizens Advice Tadley. All rights reserved.
-            </p>
-        </div>
-    </div>
+<body style="margin: 0; padding: 0; font-family: 'Open Sans', Arial, sans-serif; background-color: #f9fafb;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f9fafb;">
+        <tr>
+            <td style="padding: 40px 20px;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #ffffff; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; border-bottom: 3px solid #004b88;">
+                            <img src="https://www.catadley.org/images/cablogonew.png" alt="Citizens Advice Tadley Logo" style="height: 70px; margin-bottom: 20px;">
+                            <h1 style="color: #004b88; margin: 0; font-size: 24px; font-weight: bold;">Client Account Invitation</h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h2 style="color: #004b88; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Welcome to Citizens Advice Tadley</h2>
+                            
+                            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+                                You have been invited to create an account to access our secure debt advice portal.
+                            </p>
+                            
+                            <div style="background-color: #e6f2ff; border-left: 4px solid #004b88; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #004b88; font-weight: 600; font-size: 16px;">
+                                    <strong>Your Details:</strong><br>
+                                    CA Office: {{ ca_office }}<br>
+                                    CA Client Number: {{ ca_client_number }}
+                                </p>
+                            </div>
+                            
+                            <div style="text-align: center; margin: 40px 0;">
+                                <a href="{{ registration_link }}" style="display: inline-block; background-color: #004b88; color: #ffffff; text-decoration: none; padding: 15px 30px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                                    Create Your Account
+                                </a>
+                            </div>
+                            
+                            <p style="color: #6b7280; margin: 30px 0 0 0; font-size: 14px; line-height: 1.5;">
+                                <strong>Important:</strong> This invitation link will expire after 7 days. If you have any questions, please contact your adviser.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f3f4f6; padding: 30px; text-align: center; border-radius: 0 0 8px 8px;">
+                            <p style="color: #6b7280; margin: 0; font-size: 14px;">
+                                Citizens Advice Tadley - {{ ca_office }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

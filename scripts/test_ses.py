@@ -11,13 +11,13 @@ import logging
 from datetime import datetime
 
 # Add the src directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from utils.ses_email_service import (
+from src.utils.ses_email_service import (
     email_service, send_password_reset_email, 
     send_invitation_email, send_2fa_code_email
 )
-from config.settings import settings
+from src.config.settings import settings
 
 # Configure logging
 logging.basicConfig(

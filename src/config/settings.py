@@ -84,7 +84,8 @@ class Settings(BaseSettings):
     log_file: str = os.getenv("LOG_FILE", "app.log")
     
     class Config:
-        env_file = ".env"
+        # env_file = ".env"  # Temporarily disabled due to encoding issues
         case_sensitive = False
+        extra = "ignore"  # Allow extra environment variables
 
 settings = Settings()
