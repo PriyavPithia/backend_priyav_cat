@@ -28,6 +28,7 @@ from ..utils.file_utils import (
     create_files_zip,
     get_client_id_from_user
 )
+from ..utils.s3_first_storage import s3_first_storage as hybrid_storage
 from ..config.settings import settings
 
 router = APIRouter()
@@ -125,9 +126,9 @@ async def upload_file(
         
         logger.debug(f"Client ID for file naming: {client_id}")
         
-        # Save the file
-        logger.debug("Calling save_uploaded_file...")
-        file_path, metadata = await save_uploaded_file(
+        # Save file using hybrid storage (S3 + local)
+        logger.debug("Calling hybrid storage save_file...")
+        success, file_path, s3_key, metadata = await hybrid_storage.save_file(
             file=file,
             case_id=upload_request.case_id,
             uploaded_by_id=current_user.id,
@@ -135,6 +136,13 @@ async def upload_file(
             encrypt=True,
             category=upload_request.category
         )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to save file"
+            )
+            
         logger.info(f"File saved successfully: {file.filename} -> {file_path}")
         
         # Create database record
@@ -150,6 +158,9 @@ async def upload_file(
             file_size=metadata['file_size'],
             file_extension=metadata['file_extension'],
             mime_type=metadata['mime_type'],
+            # S3 fields
+            s3_key=s3_key,
+            storage_type=metadata.get('storage_type', 'local'),
             category=FileCategory(upload_request.category) if upload_request.category else FileCategory.OTHER,
             status=FileStatus.UPLOADED,
             file_hash=metadata['file_hash'],
@@ -170,14 +181,27 @@ async def upload_file(
         db.refresh(file_record)
         
         # Log successful file upload
+        ip_address = get_client_ip_address(request)
         AuditLog.log_action(
             db,
             action="file_upload",
             user_id=current_user.id,
             office_id=current_user.office_id,
             description=f"Uploaded {file_record.original_filename} ({file_record.file_size_formatted}) for case {upload_request.case_id}",
-            ip_address=get_client_ip_address(request),
-            success=True
+            ip_address=ip_address,
+            success=True,
+            file_id=str(file_record.id),
+            filename=file_record.original_filename,
+            resource_type="file",
+            resource_id=str(file_record.id)
+        )
+        db.commit()
+        log_file_operation(
+            "upload",
+            file_id=str(file_record.id),
+            user_id=current_user.id,
+            details=f"Uploaded {file_record.original_filename} ({file_record.file_size_formatted}) for case {upload_request.case_id}",
+            ip_address=ip_address
         )
         
         return FileUploadResponse(
@@ -199,14 +223,22 @@ async def upload_file(
         )
     except Exception as e:
         # Log failed upload attempt
+        ip_address = get_client_ip_address(request)
         AuditLog.log_action(
             db,
             action="file_upload",
             user_id=current_user.id,
             office_id=current_user.office_id,
             description=f"Failed to upload {file.filename}: {str(e)}",
-            ip_address=get_client_ip_address(request),
+            ip_address=ip_address,
             success=False
+        )
+        db.commit()
+        log_file_operation(
+            "upload_failed",
+            user_id=current_user.id,
+            details=f"Failed to upload {file.filename}: {str(e)}",
+            ip_address=ip_address
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -334,28 +366,32 @@ async def view_file(
             detail="Access denied to this file"
         )
     
-    # Check if file exists
-    full_file_path = os.path.join(settings.upload_dir, file_record.file_path)
-    if not os.path.exists(full_file_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found on disk"
-        )
-    
-    # Read file content (handles decryption if needed)
+    # Read file content from storage
     try:
-        file_content = await read_uploaded_file(
-            full_file_path, 
-            file_record.encryption_key_id
-        )
+        # Get file from storage using both s3_key and local_path
+        s3_key = file_record.s3_key or file_record.file_path
+        local_path = getattr(file_record, 'local_path', None) or file_record.file_path if not file_record.s3_key else None
+        file_content = hybrid_storage.get_file(local_path, s3_key)
+        
+        if not file_content:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File content not found in storage"
+            )
+        
+        # Decrypt if necessary
+        if file_record.is_encrypted and file_record.encryption_key_id:
+            from ..utils.file_utils import decrypt_file_content
+            file_content = decrypt_file_content(file_content, file_record.encryption_key_id.encode())
 
         # Determine best-effort MIME type from decrypted content when stored MIME is generic
         actual_mime = file_record.mime_type
         if not actual_mime or actual_mime == 'application/octet-stream':
             try:
-                detected = get_file_mime_type(file_content)
-                if detected:
-                    actual_mime = detected
+                if file_content:  # Additional safety check
+                    detected = get_file_mime_type(file_content)
+                    if detected:
+                        actual_mime = detected
             except Exception:
                 # fallback to stored mime_type if detection fails
                 actual_mime = file_record.mime_type or 'application/octet-stream'
@@ -396,14 +432,27 @@ async def view_file(
             security_headers["Content-Security-Policy"] += " object-src 'self';"
 
         # Log file view
+        ip_address = get_client_ip_address(request)
         AuditLog.log_action(
             db,
             action="file_view",
             user_id=current_user.id,
             office_id=current_user.office_id,
             description=f"Viewed {file_record.original_filename} for case {file_record.case_id}",
-            ip_address=get_client_ip_address(request),
-            success=True
+            ip_address=ip_address,
+            success=True,
+            file_id=str(file_record.id),
+            filename=file_record.original_filename,
+            resource_type="file",
+            resource_id=str(file_record.id)
+        )
+        db.commit()
+        log_file_operation(
+            "view",
+            file_id=str(file_record.id),
+            user_id=current_user.id,
+            details=f"Viewed {file_record.original_filename} for case {file_record.case_id}",
+            ip_address=ip_address
         )
 
         return Response(
@@ -447,26 +496,44 @@ async def download_file(
             detail="Access denied to this file"
         )
     
-    # Check if file exists
-    full_file_path = os.path.join(settings.upload_dir, file_record.file_path)
-    if not os.path.exists(full_file_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found on disk"
-        )
-    
     # Update download tracking
     file_record.download_count += 1
     file_record.last_downloaded = datetime.utcnow()
     file_record.downloaded_by_id = current_user.id
     db.commit()
     
-    # Read file content (handles decryption if needed)
+    # Try to use S3 presigned URL for direct download (more efficient)
+    s3_key = file_record.s3_key or file_record.file_path
+    local_path = getattr(file_record, 'local_path', None) or file_record.file_path if not file_record.s3_key else None
+    
+    logger.info(f"File download request for {file_id}:")
+    logger.info(f"  - file_record.s3_key: {file_record.s3_key}")
+    logger.info(f"  - file_record.file_path: {file_record.file_path}")
+    logger.info(f"  - computed s3_key: {s3_key}")
+    logger.info(f"  - computed local_path: {local_path}")
+    
+    # Download file content and serve directly (with decryption for encrypted files)
     try:
-        file_content = await read_uploaded_file(
-            full_file_path, 
-            file_record.encryption_key_id
-        )
+        logger.info(f"Serving file {file_id} directly through API with decryption")
+        
+        # Get encrypted file content from storage
+        file_content = hybrid_storage.get_file(local_path, s3_key)
+        
+        if not file_content:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File content not found in storage"
+            )
+        
+        # Decrypt if needed
+        if file_record.encryption_key_id:
+            from ..utils.file_utils import decrypt_file_content
+            logger.info(f"Decrypting file {file_id} with encryption key")
+            file_content = decrypt_file_content(
+                file_content, 
+                file_record.encryption_key_id.encode()
+            )
+            logger.info(f"File {file_id} decrypted successfully")
         
         # Generate display filename for download (with client prefix and converted extension)
         display_filename = file_record.original_filename
@@ -486,14 +553,27 @@ async def download_file(
             display_filename = file_record.stored_filename
         
         # Log file download
+        ip_address = get_client_ip_address(request)
         AuditLog.log_action(
             db,
             action="file_download",
             user_id=current_user.id,
             office_id=current_user.office_id,
             description=f"Downloaded {file_record.original_filename} for case {file_record.case_id}",
-            ip_address=get_client_ip_address(request),
-            success=True
+            ip_address=ip_address,
+            success=True,
+            file_id=str(file_record.id),
+            filename=file_record.original_filename,
+            resource_type="file",
+            resource_id=str(file_record.id)
+        )
+        db.commit()
+        log_file_operation(
+            "download",
+            file_id=str(file_record.id),
+            user_id=current_user.id,
+            details=f"Downloaded {file_record.original_filename} for case {file_record.case_id}",
+            ip_address=ip_address
         )
         
         # Return file content as response for download
@@ -548,39 +628,54 @@ async def delete_file(
             detail="Access denied to this file"
         )
     
-    # Delete file from storage
-    full_file_path = os.path.join(settings.upload_dir, file_record.file_path)
-    logger.debug(f"Attempting to delete file from storage: {full_file_path}")
+    # Delete file from S3 storage
+    s3_key = file_record.s3_key or file_record.file_path
+    local_path = getattr(file_record, 'local_path', None) or file_record.file_path if not file_record.s3_key else None
+    logger.debug(f"Attempting to delete file from storage: s3_key={s3_key}, local_path={local_path}")
     
-    storage_deleted = False
-    if os.path.exists(full_file_path):
-        try:
-            from ..utils.file_utils import delete_file as delete_file_from_storage
-            storage_deleted = delete_file_from_storage(full_file_path)
-            logger.info(f"File deletion from storage: {'success' if storage_deleted else 'failed'}")
-        except Exception as e:
-            logger.error(f"Error deleting file from storage: {str(e)}")
-            storage_deleted = False
-    else:
-        logger.warning(f"File not found in storage: {full_file_path}")
-        storage_deleted = True  # Consider it "deleted" if it doesn't exist
+    try:
+        storage_deleted = hybrid_storage.delete_file(local_path, s3_key)
+        logger.info(f"File deletion from storage: {'success' if storage_deleted else 'failed'}")
+    except Exception as e:
+        logger.error(f"Error deleting file from storage: {str(e)}")
+        # For S3-only storage, we should fail the deletion if S3 deletion fails
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete file from storage: {str(e)}"
+        )
     
     # Delete database record
     try:
+        # Remove existing audit log entries referencing this file to avoid FK violations
+        db.query(AuditLog).filter(AuditLog.file_id == str(file_record.id)).delete(synchronize_session=False)
+
         db.delete(file_record)
-        db.commit()
         logger.info(f"File record deleted from database: {file_id}")
-        
-        # Log successful file deletion
+
+        # Log successful file deletion without dangling FK reference
+        ip_address = get_client_ip_address(request)
+
         AuditLog.log_action(
             db,
             action="file_deletion",
             user_id=current_user.id,
             office_id=current_user.office_id,
             description=f"Deleted {file_record.original_filename} for case {file_record.case_id} (storage_deleted: {storage_deleted})",
-            ip_address=get_client_ip_address(request),
-            success=True
+            ip_address=ip_address,
+            success=True,
+            resource_type="file",
+            resource_id=str(file_record.id)
         )
+
+        log_file_operation(
+            "delete",
+            file_id=str(file_record.id),
+            user_id=current_user.id,
+            details=f"Deleted {file_record.original_filename} for case {file_record.case_id} (storage_deleted: {storage_deleted})",
+            ip_address=ip_address
+        )
+
+        db.commit()
     except Exception as e:
         logger.error(f"Error deleting file record from database: {str(e)}")
         db.rollback()
@@ -589,30 +684,7 @@ async def delete_file(
             detail=f"Failed to delete file record: {str(e)}"
         )
     
-    # Try to remove empty directories (case directory and parent directory)
-    try:
-        case_dir = os.path.dirname(full_file_path)
-        parent_dir = os.path.dirname(case_dir)
-        
-        # Remove case directory if empty
-        if os.path.exists(case_dir) and not os.listdir(case_dir):
-            os.rmdir(case_dir)
-            logger.debug(f"Removed empty case directory: {case_dir}")
-            
-            # Remove parent directory if it's also empty (but never delete the uploads folder itself)
-            if (os.path.exists(parent_dir) and 
-                not os.listdir(parent_dir) and 
-                parent_dir != settings.upload_dir):
-                os.rmdir(parent_dir)
-                logger.debug(f"Removed empty parent directory: {parent_dir}")
-            elif parent_dir == settings.upload_dir:
-                logger.debug(f"Skipped deletion of uploads root directory: {parent_dir}")
-            else:
-                logger.debug(f"Parent directory not empty or doesn't exist: {parent_dir}")
-        else:
-            logger.debug(f"Case directory not empty or doesn't exist: {case_dir}")
-    except Exception as e:
-        logger.debug(f"Could not remove directory (may not be empty): {str(e)}")
+    # Note: No local directory cleanup needed for S3-only storage
     
     return {
         "message": "File deleted successfully",

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to Citizens Advice Debt Advice Service</title>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+  
+  <style>
+    /* Reset and base styles */
+    body {
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      line-height: 1.6;
+      color: #4b5563;
+      margin: 0;
+      padding: 0;
+      background-color: #f3f4f6;
+    }
+    
+    .email-container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Header with CA branding */
+    .email-header {
+      background: linear-gradient(135deg, #004b88 0%, #0066cc 100%);
+      color: #ffffff;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    
+    .ca-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 5px;
+      letter-spacing: 0.5px;
+    }
+    
+    .email-header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+    
+    /* Content area */
+    .email-content {
+      padding: 40px 30px;
+    }
+    
+    .email-content p {
+      margin: 0 0 16px 0;
+      color: #4b5563;
+      font-size: 16px;
+    }
+    
+    .email-content h3 {
+      color: #004b88;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 25px 0 15px 0;
+    }
+    
+    .email-content ul {
+      margin: 16px 0 16px 20px;
+      color: #4b5563;
+    }
+    
+    /* Button */
+    .ca-button {
+      display: inline-block;
+      background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+      color: #ffffff !important;
+      padding: 14px 28px;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 16px;
+      text-align: center;
+      border: none;
+      cursor: pointer;
+    }
+    
+    .ca-button:hover {
+      background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(22, 163, 74, 0.3);
+    }
+    
+    /* Info box */
+    .info-box {
+      background-color: #f0f8ff;
+      border: 1px solid #3399ff;
+      border-left: 4px solid #0066cc;
+      padding: 20px;
+      border-radius: 6px;
+      margin: 25px 0;
+    }
+    
+    .info-box h3 {
+      color: #004b88;
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+    
+    .info-box p {
+      margin: 8px 0;
+      color: #4b5563;
+    }
+    
+    /* Warning box */
+    .warning-box {
+      background-color: #fffbeb;
+      border: 1px solid #f97316;
+      border-left: 4px solid #ea580c;
+      padding: 20px;
+      border-radius: 6px;
+      margin: 25px 0;
+    }
+    
+    /* Contact info */
+    .contact-info {
+      background-color: #f0f8ff;
+      padding: 20px;
+      border-radius: 6px;
+      margin: 25px 0;
+      border-left: 4px solid #0066cc;
+    }
+    
+    .contact-info h4 {
+      color: #004b88;
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+    
+    /* Footer */
+    .email-footer {
+      background-color: #f8fafc;
+      padding: 30px 20px;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .email-footer p {
+      margin: 8px 0;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    
+    .email-footer .company-name {
+      font-weight: 600;
+      color: #004b88;
+      font-size: 16px;
+    }
+    
+    /* Responsive styles */
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        margin: 10px;
+        border-radius: 6px;
+      }
+      
+      .email-header, .email-content, .email-footer {
+        padding: 20px 15px;
+      }
+      
+      .ca-button {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+      }
+    }
+    
+    .text-center {
+      text-align: center;
+    }
+    
+    .margin-large {
+      margin: 30px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+  <div class="ca-logo">Citizens Advice</div>
+      <h1>Welcome to Our Debt Advice Service</h1>
+    </div>
+    
+    <div class="email-content">
+      <p>Dear {% if user_name %}<strong>{{user_name}}</strong>{% else %}<strong>Client</strong>{% endif %},</p>
+      
+      <p>You have been invited to access our secure online debt advice portal. This system will help you manage your debt advice case and communicate directly with your adviser.</p>
+
+      <div class="info-box">
+        <h3>📋 Your Account Details</h3>
+        <p><strong>Email:</strong> {{user_email}}</p>
+        <p><strong>Office:</strong> {{office_name}}</p>
+        {% if ca_client_number %}
+        <p><strong>Client Number:</strong> {{ca_client_number}}</p>
+        {% endif %}
+      </div>
+
+      <h3>🌟 What You Can Do With This System:</h3>
+      <ul>
+        <li>View and update your debt information securely</li>
+        <li>Upload supporting documents (bank statements, bills, etc.)</li>
+        <li>Track the progress of your debt advice case</li>
+        <li>Receive updates and messages from your adviser</li>
+        <li>Access helpful debt advice resources and guides</li>
+        <li>Download case reports and action plans</li>
+      </ul>
+
+      <p>Click the button below to set up your account and create your secure password:</p>
+      
+      <div class="text-center margin-large">
+        <a href="{{invitation_url}}" class="ca-button">Set Up My Account</a>
+      </div>
+
+      <div class="warning-box">
+        <p style="color: #c2410c; margin: 0;"><strong>⏰ Important:</strong> This invitation will expire on <strong>{{expires_at}}</strong>. Please set up your account as soon as possible to ensure you don't lose access.</p>
+      </div>
+      
+      <h3>🔒 Your Privacy & Security</h3>
+      <p>Your information is completely secure and confidential. Only you and your assigned adviser can access your case details. We use bank-level security to protect your data.</p>
+
+      <div class="contact-info">
+        <h4>📞 Need Help or Have Questions?</h4>
+        <p>If you need assistance setting up your account or have questions about the debt advice process:</p>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+          <li><strong>Phone:</strong> 0800 144 8848</li>
+          <li><strong>Email:</strong> admin@catadley.com</li>
+          <li><strong>Office Hours:</strong> Weekdays, 10am - 1pm (10am - 3:30pm on Monday and Thursday)</li>
+        </ul>
+        <p style="font-size: 14px; color: #6b7280;">We are closed weekends and public holidays</p>
+      </div>
+    </div>
+    
+    <div class="email-footer">
+  <p class="company-name">Citizens Advice</p>
+      <p>Debt Advice Service</p>
+      <p style="font-size: 12px; color: #9ca3af; margin-top: 15px;">
+  <strong>Confidential:</strong> This email contains confidential information.<br>
+  If you received this in error, please delete it immediately and contact us.<br>
+  📍 Citizens Advice, Turbary Building, Franklin Avenue, Tadley, RG26 4ET
+      </p>
+    </div>
+  </div>
+</body>
+</html>

@@ -11,10 +11,17 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 # CSRF protection removed due to compatibility issues
 
-from .config.settings import settings
-from .config.logging import setup_logging, get_logger
-from .models import create_tables
-from .routes import auth, cases, admin, offices, client_details, profile, notifications, session_settings, files
+try:
+    from .config.settings import settings
+    from .config.logging import setup_logging, get_logger
+    from .models import create_tables
+    from .routes import auth, cases, admin, offices, client_details, profile, notifications, session_settings, files
+except ImportError:
+    # Fallback for when running as script
+    from config.settings import settings
+    from config.logging import setup_logging, get_logger
+    from models import create_tables
+    from routes import auth, cases, admin, offices, client_details, profile, notifications, session_settings, files
 # Import other routes as we create them
 
 # Initialize rate limiter
@@ -59,11 +66,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Security middleware
 if not settings.debug:
-    # Include Railway and your custom domains. Override via ALLOWED_HOSTS env in prod.
-    allowed_hosts = os.getenv(
-        "ALLOWED_HOSTS",
-        "*.citizensadvicetadley.org.uk,*.up.railway.app,web-production-dd1a.up.railway.app"
-    ).split(",")
+    allowed_hosts = os.getenv("ALLOWED_HOSTS", "*.citizensadvicetadley.org.uk").split(",")
     app.add_middleware(
         TrustedHostMiddleware, 
         allowed_hosts=allowed_hosts
@@ -75,9 +78,8 @@ app.add_middleware(
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"],
-    expose_headers=["Content-Type", "Authorization"],
-    max_age=3600
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    expose_headers=["Content-Type", "Authorization"]
 )
 
 # Security headers middleware
@@ -109,7 +111,7 @@ async def add_security_headers(request: Request, call_next):
             "style-src 'self'; "  # Remove unsafe-inline
             "img-src 'self' data: blob:; "
             "font-src 'self' data:; "
-            "connect-src 'self' https://catadley-hhz5h.ondigitalocean.app; "
+            "connect-src 'self'; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
             "form-action 'self'; "

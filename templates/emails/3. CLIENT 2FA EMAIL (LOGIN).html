@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title or 'Login Verification Code - Citizens Advice Tadley' }}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Open Sans', Arial, sans-serif; background-color: #f9fafb;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f9fafb;">
+        <tr>
+            <td style="padding: 40px 20px;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #ffffff; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; border-bottom: 3px solid #004b88;">
+                            <img src="https://www.catadley.org/images/cablogonew.png" alt="Citizens Advice Tadley Logo" style="height: 70px; margin-bottom: 20px;">
+                            <h1 style="color: #004b88; margin: 0; font-size: 24px; font-weight: bold;">{{ heading_title or 'Login Verification' }}</h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h2 style="color: #004b88; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Your Verification Code</h2>
+                            
+                            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+                                {{ intro_text or "You requested to log in to your Citizens Advice Tadley account. Use the verification code below to complete your login." }}
+                            </p>
+                            
+                            <div style="background-color: #e6f2ff; border: 2px solid #004b88; padding: 30px; margin: 30px 0; border-radius: 8px; text-align: center;">
+                                <p style="margin: 0; color: #004b88; font-weight: 700; font-size: 32px; letter-spacing: 4px;">
+                                    {{ verification_code }}
+                                </p>
+                            </div>
+                            
+                            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.5;">
+                                    <strong>Security Notice:</strong> This code will expire in 10 minutes. If you didn't request this login, please ignore this email and contact us immediately.
+                                </p>
+                            </div>
+                            
+                            <p style="color: #6b7280; margin: 30px 0 0 0; font-size: 14px; line-height: 1.5;">
+                                <strong>Login Details:</strong><br>
+                                Time: {{ login_time }}<br>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f3f4f6; padding: 30px; text-align: center; border-radius: 0 0 8px 8px;">
+                            <p style="color: #6b7280; margin: 0; font-size: 14px;">
+                                Citizens Advice Tadley
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

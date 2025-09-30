@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Verification Code - Citizens Advice</title>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+  
+  <style>
+    /* Reset and base styles */
+    body {
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      line-height: 1.6;
+      color: #4b5563;
+      margin: 0;
+      padding: 0;
+      background-color: #f3f4f6;
+    }
+    
+    .email-container {
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Header with CA branding */
+    .email-header {
+      background: linear-gradient(135deg, #004b88 0%, #0066cc 100%);
+      color: #ffffff;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    
+    .ca-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 5px;
+      letter-spacing: 0.5px;
+    }
+    
+    .email-header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+    
+    /* Content area */
+    .email-content {
+      padding: 40px 30px;
+    }
+    
+    .email-content p {
+      margin: 0 0 16px 0;
+      color: #4b5563;
+      font-size: 16px;
+    }
+    
+    .email-content h3 {
+      color: #004b88;
+      font-size: 18px;
+      font-weight: 600;
+      margin: 25px 0 15px 0;
+    }
+    
+    .email-content ul, .email-content ol {
+      margin: 16px 0 16px 20px;
+      color: #4b5563;
+    }
+    
+    /* Code display */
+    .code-display {
+      background: linear-gradient(135deg, #004b88 0%, #0066cc 100%);
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      text-align: center;
+      padding: 25px 20px;
+      border-radius: 8px;
+      margin: 25px 0;
+      font-family: 'Courier New', monospace;
+      box-shadow: 0 4px 8px rgba(0, 75, 136, 0.2);
+    }
+    
+    /* Info box */
+    .info-box {
+      background-color: #f0f8ff;
+      border: 1px solid #3399ff;
+      border-left: 4px solid #0066cc;
+      padding: 20px;
+      border-radius: 6px;
+      margin: 25px 0;
+    }
+    
+    .info-box h3 {
+      color: #004b88;
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+    
+    /* Warning box */
+    .warning-box {
+      background-color: #fffbeb;
+      border: 1px solid #f97316;
+      border-left: 4px solid #ea580c;
+      padding: 20px;
+      border-radius: 6px;
+      margin: 25px 0;
+    }
+    
+    .warning-box h3 {
+      color: #c2410c;
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+    
+    /* Footer */
+    .email-footer {
+      background-color: #f8fafc;
+      padding: 30px 20px;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .email-footer p {
+      margin: 8px 0;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    
+    .email-footer .company-name {
+      font-weight: 600;
+      color: #004b88;
+      font-size: 16px;
+    }
+    
+    /* Responsive styles */
+    @media only screen and (max-width: 600px) {
+      .email-container {
+        margin: 10px;
+        border-radius: 6px;
+      }
+      
+      .email-header, .email-content, .email-footer {
+        padding: 20px 15px;
+      }
+      
+      .code-display {
+        font-size: 24px;
+        letter-spacing: 4px;
+      }
+    }
+    
+    .text-center {
+      text-align: center;
+    }
+    
+    .margin-large {
+      margin: 30px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+  <div class="ca-logo">Citizens Advice</div>
+      <h1>Two-Factor Authentication</h1>
+    </div>
+
+    <div class="email-content">
+      <p>Hello <strong>{{ user_name }}</strong>,</p>
+      
+  <p>You're attempting to log in to the Citizen Advice Debt Advice Tool. To complete your login securely, please use the verification code below:</p>
+      
+      <div class="code-display">
+        {{ verification_code }}
+      </div>
+
+      <div class="info-box">
+        <h3>🔐 How to Use This Code:</h3>
+        <ol>
+          <li>Return to the login page where you were prompted for the code</li>
+          <li>Enter this 6-digit code exactly as shown above</li>
+          <li>Click "Verify" to complete your secure login</li>
+        </ol>
+      </div>
+
+      <div class="warning-box">
+        <h3>⚠️ Security Information</h3>
+        <ul>
+          <li><strong>This code expires in {{ expire_minutes }} minutes</strong></li>
+          <li>The code can only be used once</li>
+          <li>Never share this code with anyone</li>
+          <li>If you didn't attempt to log in, contact support immediately</li>
+        </ul>
+      </div>
+
+      <h3>💡 Why Two-Factor Authentication?</h3>
+      <p>Two-factor authentication adds an extra layer of security to your account. Even if someone has your password, they won't be able to access your account without access to your email.</p>
+
+      <h3>🛠️ Having Trouble?</h3>
+      <p>If you're experiencing issues with the verification code or logging in:</p>
+      <ul>
+        <li>Ensure you're entering the code exactly as shown above</li>
+        <li>Make sure you're using the most recent code (older codes expire)</li>
+        <li>Try refreshing the login page and requesting a new code if needed</li>
+        <li>Contact our support team if problems persist</li>
+      </ul>
+    </div>
+
+    <div class="email-footer">
+  <p class="company-name">Citizens Advice</p>
+      <p>Protecting your account with secure authentication</p>
+      <p style="font-size: 12px; color: #9ca3af; margin-top: 15px;">
+        This is an automated security message. Please do not reply to this email.<br>
+        📞 Support: 0800 144 8848 | ✉️ admin@catadley.com<br>
+        This verification code is for your account only and should not be shared.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

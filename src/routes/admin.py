@@ -1,23 +1,42 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import String
 from sqlalchemy import or_, and_, text
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
-import datetime as dt
+from datetime import datetime, timedelta
 import secrets
 import string
 import json
 import os
-import logging
 
-from ..config.database import get_db
-from ..models import User, Case, Office, UserRole, UserStatus, CaseStatus, CasePriority, AuditLog, Notification, NotificationType, Debt, Asset, Income, Expenditure, FileUpload, ClientDetails
-from .auth import get_current_user, TokenResponse, UserResponse
-from ..utils.auth import hash_password, get_lockout_remaining_time, get_client_ip_address, generate_reset_token, generate_invitation_token
-from ..utils.ses_email_service import send_password_reset_email, send_invitation_email
+try:
+    from ..config.database import get_db
+    from ..config.logging import get_logger
+    from ..models import User, Case, Office, UserRole, UserStatus, CaseStatus, CasePriority, AuditLog, Notification, NotificationType, Debt, Asset, Income, Expenditure, FileUpload, ClientDetails
+    from .auth import get_current_user, TokenResponse, UserResponse
+    from .auth import generate_next_client_number
+    from ..utils.auth import hash_password, get_lockout_remaining_time, get_client_ip_address
+    from ..services.email_service import send_invitation_email, send_user_created_email
+    from ..config.settings import settings
+except ImportError:
+    # Fallback for when running as script
+    from config.database import get_db
+    from config.logging import get_logger
+    from models import User, Case, Office, UserRole, UserStatus, CaseStatus, CasePriority, AuditLog, Notification, NotificationType, Debt, Asset, Income, Expenditure, FileUpload, ClientDetails
+    from routes.auth import get_current_user, TokenResponse, UserResponse
+    from utils.auth import hash_password, get_lockout_remaining_time, get_client_ip_address
+    from services.email_service import send_invitation_email, send_user_created_email
+    from config.settings import settings
+    from config.logging import get_logger
+    from models import User, Case, Office, UserRole, UserStatus, CaseStatus, CasePriority, AuditLog, Notification, NotificationType, Debt, Asset, Income, Expenditure, FileUpload, ClientDetails
+    from routes.auth import get_current_user, TokenResponse, UserResponse
+    from utils.auth import hash_password, get_lockout_remaining_time, get_client_ip_address
+    from services.email_service import send_invitation_email, send_user_created_email
+    from config.settings import settings
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger('admin')
 
 class AdminCaseResponse(BaseModel):
     id: str
@@ -39,10 +58,26 @@ class AdminCaseResponse(BaseModel):
     total_assets: Optional[str]
     total_income: Optional[str]
     total_expenditure: Optional[str]
-    created_at: dt.datetime
-    updated_at: dt.datetime
-    last_activity: Optional[dt.datetime]
+    created_at: datetime
+    updated_at: datetime
+    last_activity: Optional[datetime]
     notes: Optional[str]
+    # Additional client information
+    client_title: Optional[str] = None
+    client_first_name: Optional[str] = None
+    client_last_name: Optional[str] = None
+    client_home_phone: Optional[str] = None
+    client_mobile_phone: Optional[str] = None
+    client_home_address: Optional[str] = None
+    client_postcode: Optional[str] = None
+    client_date_of_birth: Optional[str] = None
+    client_gender: Optional[str] = None
+    client_ethnicity: Optional[str] = None
+    client_nationality: Optional[str] = None
+    client_religion: Optional[str] = None
+    client_marital_status: Optional[str] = None
+    client_occupation: Optional[str] = None
+    client_housing_tenure: Optional[str] = None
 
 class DetailedDebtResponse(BaseModel):
     id: str
@@ -50,12 +85,13 @@ class DetailedDebtResponse(BaseModel):
     debt_type_display: str
     amount_owed: Optional[str]
     creditor_name: Optional[str]
+    is_joint: Optional[bool]
     additional_info: Optional[str]
     other_parent_name: Optional[str]
     benefit_type: Optional[str]
     fine_reason: Optional[str]
     is_priority_debt: bool
-    created_at: dt.datetime
+    created_at: datetime
 
 class DetailedAssetResponse(BaseModel):
     id: str
@@ -63,12 +99,13 @@ class DetailedAssetResponse(BaseModel):
     asset_type_display: str
     description: Optional[str]
     estimated_value: Optional[str]
+    is_joint: Optional[bool]
     property_address: Optional[str]
     property_postcode: Optional[str]
     vehicle_registration: Optional[str]
     savings_institution: Optional[str]
     additional_info: Optional[str]
-    created_at: dt.datetime
+    created_at: datetime
 
 class DetailedIncomeResponse(BaseModel):
     id: str
@@ -80,7 +117,7 @@ class DetailedIncomeResponse(BaseModel):
     source_description: Optional[str]
     is_regular_amount: Optional[str]
     additional_info: Optional[str]
-    created_at: dt.datetime
+    created_at: datetime
 
 class DetailedExpenditureResponse(BaseModel):
     id: str
@@ -90,7 +127,7 @@ class DetailedExpenditureResponse(BaseModel):
     frequency: Optional[str]
     provider_name: Optional[str]
     additional_info: Optional[str]
-    created_at: dt.datetime
+    created_at: datetime
 
 class FileUploadResponse(BaseModel):
     id: str
@@ -101,10 +138,15 @@ class FileUploadResponse(BaseModel):
     file_size_formatted: str
     file_extension: str
     category: str
+    # Specific types selected during upload (when applicable)
+    debt_type: Optional[str] = None
+    asset_type: Optional[str] = None
+    income_type: Optional[str] = None
+    expenditure_type: Optional[str] = None
     description: Optional[str]
     is_image: bool
     is_document: bool
-    created_at: dt.datetime
+    created_at: datetime
     was_converted: Optional[bool] = False
     uploaded_by_id: str
 
@@ -115,6 +157,51 @@ class DetailedCaseResponse(BaseModel):
     income: List[DetailedIncomeResponse]
     expenditure: List[DetailedExpenditureResponse]
     files: List[FileUploadResponse]
+
+@router.get("/users/{user_id}/client-details")
+async def get_user_client_details(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Return client details for a given user (admin/adviser only)."""
+    # Only admins/advisers (not superusers per existing rules) can access
+    try:
+        require_admin_access(current_user)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    try:
+        details = db.query(ClientDetails).filter(ClientDetails.user_id == user_id).first()
+    except Exception:
+        details = None
+
+    if not details:
+        return {}
+
+    # Normalize payload similar to /profile/client-details
+    result = {
+        "title": getattr(details, 'title', None) or "",
+        "first_name": getattr(details, 'first_name', None) or "",
+        "surname": getattr(details, 'surname', None) or "",
+        "home_address": getattr(details, 'home_address', None) or "",
+        "postcode": getattr(details, 'postcode', None) or "",
+        "date_of_birth": (details.date_of_birth.isoformat() if getattr(details, 'date_of_birth', None) and hasattr(details.date_of_birth, 'isoformat') else (getattr(details, 'date_of_birth', None) or "")),
+        "gender": getattr(details, 'gender', None) or "",
+        "home_phone": getattr(details, 'home_phone', None) or "",
+        "mobile_phone": getattr(details, 'mobile_phone', None) or "",
+        "email": getattr(details, 'email', None) or "",
+        "happy_voicemail": bool(getattr(details, 'happy_voicemail', False)),
+        "happy_text_messages": bool(getattr(details, 'happy_text_messages', False)),
+        "preferred_contact_email": bool(getattr(details, 'preferred_contact_email', False)),
+        "preferred_contact_mobile": bool(getattr(details, 'preferred_contact_mobile', False)),
+        "preferred_contact_home_phone": bool(getattr(details, 'preferred_contact_home_phone', False)),
+        "preferred_contact_address": bool(getattr(details, 'preferred_contact_address', False)),
+        "do_not_contact_methods": getattr(details, 'do_not_contact_methods', None) or "",
+        "agree_to_feedback": bool(getattr(details, 'agree_to_feedback', False)),
+        "do_not_contact_feedback_methods": getattr(details, 'do_not_contact_feedback_methods', None) or ""
+    }
+    return result
 
 class InviteUserRequest(BaseModel):
     email: EmailStr
@@ -176,10 +263,11 @@ class InviteAdviserRequest(BaseModel):
     last_name: str
     office_id: str
     is_office_admin: bool = False
+    phone: Optional[str] = None
 
 class InviteLinkResponse(BaseModel):
     invite_url: str
-    expires_at: dt.datetime
+    expires_at: datetime
     email: str
 
 class AcceptInvitationRequest(BaseModel):
@@ -196,6 +284,55 @@ def require_admin_access(current_user: User):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
         )
+
+def _is_valid_ca_client_number(value: str) -> bool:
+    """Validate format CL-XXXXX or CL-XXXXXX where X are digits."""
+    try:
+        if not isinstance(value, str):
+            return False
+        if not value.startswith("CL-"):
+            return False
+        number_part = value.split("-", 1)[1]
+        if not number_part.isdigit():
+            return False
+        # allow 1..6 digits, but canonical will be 5 until >99999
+        return 1 <= len(number_part) <= 6
+    except Exception:
+        return False
+
+def _normalize_ca_client_number(value: str) -> str:
+    """Normalize to CL-XXXXX (5 digits) or CL-XXXXXX (6 digits) depending on numeric size."""
+    number = int(value.split("-", 1)[1])
+    if number <= 99999:
+        return f"CL-{number:05d}"
+    return f"CL-{number:06d}"
+
+@router.get("/ca-client-number/next")
+async def get_next_ca_client_number(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Return the next suggested CA client number for convenience in the UI."""
+    require_admin_access(current_user)
+    try:
+        next_number = generate_next_client_number(db)
+        return {"ca_client_number": next_number}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate next client number: {str(e)}")
+
+@router.get("/ca-client-number/check")
+async def check_ca_client_number(
+    number: str = Query(..., description="CA client number, e.g., CL-00001"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Check whether a CA client number exists and whether it is valid format."""
+    require_admin_access(current_user)
+    if not _is_valid_ca_client_number(number):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid CA client number format. Use CL-#####.")
+    normalized = _normalize_ca_client_number(number)
+    exists = db.query(User).filter(User.ca_client_number == normalized).first() is not None
+    return {"valid": True, "exists": exists, "normalized": normalized}
 
 def require_superuser_access(current_user: User):
     """Require superuser access"""
@@ -217,24 +354,27 @@ async def list_cases(
 ):
     """List cases visible to the current user.
 
-    - Superusers: all cases
+    - Superusers: no access to cases
     - Advisers: all cases in their office (assigned and unassigned)
     - Office admins: treated as advisers in their office
     """
 
-    # Allow superusers and advisers (including office admins). Block clients.
-    if not (current_user.is_superuser or current_user.role == UserRole.ADVISER):
+    # Block superusers from accessing cases
+    if current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Superusers are not permitted to access cases"
+        )
+    
+    # Allow advisers (including office admins). Block clients.
+    if not (current_user.role == UserRole.ADVISER):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied"
         )
     
-    # For superusers, show all cases. For advisers, show all cases in their office
-    if current_user.is_superuser:
-        cases = db.query(Case).all()
-    else:
-        # Advisers can see all cases in their office (assigned and unassigned)
-        cases = db.query(Case).filter(Case.office_id == current_user.office_id).all()
+    # Advisers can see all cases in their office (assigned and unassigned)
+    cases = db.query(Case).filter(Case.office_id == current_user.office_id).all()
     
     result = []
     for case in cases:
@@ -264,7 +404,7 @@ async def list_cases(
             client_id=str(client.id),
             client_name=f"{(client.first_name or '').strip()} {(client.last_name or '').strip()}".strip() or client.email,
             client_email=client.email,
-            client_phone=getattr(client, 'phone', None),
+            client_phone=getattr(client, 'phone', None) or getattr(client, 'mobile_phone', None) or getattr(client, 'home_phone', None),
             ca_client_number=getattr(client, 'ca_client_number', '') or '',
             office_id=str(case.office_id) if getattr(case, 'office_id', None) else '',
             office_name=office.name if office else "Unknown Office",
@@ -280,8 +420,8 @@ async def list_cases(
             total_assets=getattr(case, 'total_assets_value', None),
             total_income=getattr(case, 'total_monthly_income', None),
             total_expenditure=getattr(case, 'total_monthly_expenditure', None),
-            created_at=getattr(case, 'created_at', dt.datetime.utcnow()),
-            updated_at=getattr(case, 'updated_at', getattr(case, 'created_at', dt.datetime.utcnow())),
+            created_at=getattr(case, 'created_at', datetime.utcnow()),
+            updated_at=getattr(case, 'updated_at', getattr(case, 'created_at', datetime.utcnow())),
             last_activity=getattr(case, 'updated_at', None),
             notes=getattr(case, 'additional_notes', None)
         ))
@@ -299,19 +439,23 @@ async def get_case_details(
     """Get detailed case information including all captured data"""
     
     try:
+        # Block superusers from accessing case details
+        if current_user.is_superuser:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Superusers are not permitted to access case details"
+            )
+        
         require_admin_access(current_user)
         
-        # For superusers, allow access to any case. For advisers, enforce visibility rules
-        if current_user.is_superuser:
-            case = db.query(Case).filter(Case.id == case_id).first()
-        else:
-            case = db.query(Case).filter(
-                Case.id == case_id,
-                or_(
-                    and_(Case.assigned_adviser_id == None, Case.office_id == current_user.office_id),
-                    Case.assigned_adviser_id == current_user.id
-                )
-            ).first()
+        # For advisers, enforce visibility rules
+        case = db.query(Case).filter(
+            Case.id == case_id,
+            or_(
+                and_(Case.assigned_adviser_id == None, Case.office_id == current_user.office_id),
+                Case.assigned_adviser_id == current_user.id
+            )
+        ).first()
         
         if not case:
             raise HTTPException(
@@ -334,6 +478,12 @@ async def get_case_details(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Client not found for this case"
             )
+        
+        # Try to get extended client details (may contain richer info when user self-registered)
+        try:
+            client_details = db.query(ClientDetails).filter(ClientDetails.user_id == client.id).first()
+        except Exception:
+            client_details = None
         
         # Get assigned adviser info
         assigned_adviser = None
@@ -371,7 +521,13 @@ async def get_case_details(
             client_id=str(client.id),
             client_name=f"{(client.first_name or '').strip()} {(client.last_name or '').strip()}".strip() or client.email,
             client_email=client.email,
-            client_phone=getattr(client, 'phone', None),
+            client_phone=(
+                getattr(client, 'phone', None)
+                or getattr(client, 'mobile_phone', None)
+                or getattr(client, 'home_phone', None)
+                or (getattr(client_details, 'mobile_phone', None) if client_details else None)
+                or (getattr(client_details, 'home_phone', None) if client_details else None)
+            ),
             ca_client_number=getattr(client, 'ca_client_number', '') or '',
             office_id=str(case.office_id) if case.office_id else '',
             office_name=office.name if office else "Unknown Office",
@@ -387,10 +543,29 @@ async def get_case_details(
             total_assets=getattr(case, 'total_assets_value', None),
             total_income=getattr(case, 'total_monthly_income', None),
             total_expenditure=getattr(case, 'total_monthly_expenditure', None),
-            created_at=getattr(case, 'created_at', dt.datetime.utcnow()),
-            updated_at=getattr(case, 'updated_at', getattr(case, 'created_at', dt.datetime.utcnow())),
+            created_at=getattr(case, 'created_at', datetime.utcnow()),
+            updated_at=getattr(case, 'updated_at', getattr(case, 'created_at', datetime.utcnow())),
             last_activity=getattr(case, 'updated_at', None),
-            notes=getattr(case, 'additional_notes', None)
+            notes=getattr(case, 'additional_notes', None),
+            # Additional client information
+            client_title=(getattr(client, 'title', None) or (getattr(client_details, 'title', None) if client_details else None)),
+            client_first_name=(getattr(client, 'first_name', None) or (getattr(client_details, 'first_name', None) if client_details else None)),
+            client_last_name=(getattr(client, 'last_name', None) or (getattr(client_details, 'surname', None) if client_details else None)),
+            client_home_phone=(getattr(client, 'home_phone', None) or (getattr(client_details, 'home_phone', None) if client_details else None)),
+            client_mobile_phone=(getattr(client, 'mobile_phone', None) or (getattr(client_details, 'mobile_phone', None) if client_details else None)),
+            client_home_address=(getattr(client, 'home_address', None) or (getattr(client_details, 'home_address', None) if client_details else None)),
+            client_postcode=(getattr(client, 'postcode', None) or (getattr(client_details, 'postcode', None) if client_details else None)),
+            client_date_of_birth=(
+                getattr(client, 'date_of_birth', None)
+                or ((getattr(client_details, 'date_of_birth', None).isoformat()) if (client_details and getattr(client_details, 'date_of_birth', None)) else None)
+            ),
+            client_gender=(getattr(client, 'gender', None) or (getattr(client_details, 'gender', None) if client_details else None)),
+            client_ethnicity=(getattr(client, 'ethnicity', None) or (getattr(client_details, 'ethnicity', None) if client_details else None)),
+            client_nationality=(getattr(client, 'nationality', None) or (getattr(client_details, 'nationality', None) if client_details else None)),
+            client_religion=(getattr(client, 'religion', None) or (getattr(client_details, 'religion', None) if client_details else None)),
+            client_marital_status=(getattr(client, 'marital_status', None) or (getattr(client_details, 'marital_status', None) if client_details else None)),
+            client_occupation=(getattr(client, 'occupation', None) or (getattr(client_details, 'occupation', None) if client_details else None)),
+            client_housing_tenure=(getattr(client, 'housing_tenure', None) or (getattr(client_details, 'housing_tenure', None) if client_details else None))
         )
     except Exception as e:
         raise HTTPException(
@@ -408,6 +583,7 @@ async def get_case_details(
             debt_type_display=debt.debt_type_display,
             amount_owed=debt.amount_owed,
             creditor_name=debt.creditor_name,
+            is_joint=debt.is_joint,
             additional_info=debt.additional_info,
             other_parent_name=debt.other_parent_name,
             benefit_type=debt.benefit_type,
@@ -426,6 +602,7 @@ async def get_case_details(
             asset_type_display=asset.asset_type_display,
             description=asset.description,
             estimated_value=asset.estimated_value,
+            is_joint=asset.is_joint,
             property_address=asset.property_address,
             property_postcode=asset.property_postcode,
             vehicle_registration=asset.vehicle_registration,
@@ -532,6 +709,10 @@ async def get_case_details(
             file_size_formatted=file_upload.file_size_formatted,
             file_extension=file_upload.file_extension,
             category=file_upload.category.value,
+            debt_type=file_upload.debt_type,
+            asset_type=file_upload.asset_type,
+            income_type=file_upload.income_type,
+            expenditure_type=file_upload.expenditure_type,
             description=file_upload.description,
             is_image=file_upload.is_image,
             is_document=file_upload.is_document,
@@ -834,9 +1015,21 @@ async def get_user_cases(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get cases associated with a user (superuser only)"""
+    """Get cases associated with a user (advisers only)"""
     
-    require_superuser_access(current_user)
+    # Block superusers from accessing user cases
+    if current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Superusers are not permitted to access user cases"
+        )
+    
+    # Allow advisers (including office admins)
+    if not (current_user.role == UserRole.ADVISER):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
     
     # Find the user
     user = db.query(User).filter(User.id == user_id).first()
@@ -878,6 +1071,7 @@ async def get_user_cases(
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -900,6 +1094,9 @@ async def delete_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Client not found"
         )
+    
+    # Store email for logging and response
+    user_email = user.email
     
     # Permission checks
     if current_user.is_superuser:
@@ -982,8 +1179,7 @@ async def delete_user(
     # - client_details (handled by relationship)
     # - audit_logs will remain but user_id will be set to NULL as it's nullable
     
-    # Store email for response
-    user_email = user.email
+    # Email was stored earlier for logging
     
     # Delete the user
     try:
@@ -1029,22 +1225,23 @@ async def delete_user(
             print(f"⚠️ Client details deletion failed: {client_details_error}")
             # Continue with user deletion even if client details deletion fails
         
-        # Delete the user
-        db.delete(user)
-        
-        # Create audit log for the deletion
-        audit_log = AuditLog(
+        # Create audit log BEFORE the deletion
+        AuditLog.log_action(
+            db,
+            action="account_deleted",
             user_id=current_user.id,
-            office_id=current_user.office_id,  # Add the required office_id
-            action="user_deleted",
+            office_id=current_user.office_id,
             resource_type="user",
             resource_id=user_id,
-            details=f"Deleted user {user_email}"
+            description="Account deleted",
+            details=f"Account deleted: {user_email}",
+            ip_address=get_client_ip_address(request)
         )
-        db.add(audit_log)
+        db.commit()  # Commit the audit log first
         
-        # Single commit for all operations
-        db.commit()
+        # Now delete the user
+        db.delete(user)
+        db.commit()  # Commit the deletion separately
         
         response_data = {
             "message": f"User {user_email} deleted successfully",
@@ -1097,6 +1294,12 @@ async def create_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Advisers can only create client users"
         )
+            # Validate office access
+    # if not current_user.is_superuser and office_id != current_user.office_id:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         detail="You can only create users in your own office"
+    #     )
     
     # Check if email already exists
     existing_user = db.query(User).filter(User.email == request.email).first()
@@ -1135,22 +1338,27 @@ async def create_user(
             detail="You can only create users in your own office"
         )
     
-    # Auto-generate client number for client users
+    # Auto-generate or validate provided client number for client users
     ca_client_number = None
     if request.role == "client":
         if request.ca_client_number:
-            # If a client number is provided, use it (for manual assignment)
-            ca_client_number = request.ca_client_number
+            # Validate and normalize provided number and ensure uniqueness
+            if not _is_valid_ca_client_number(request.ca_client_number):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid CA client number format. Use CL-#####")
+            normalized = _normalize_ca_client_number(request.ca_client_number)
+            exists = db.query(User).filter(User.ca_client_number == normalized).first()
+            if exists:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CA client number already exists")
+            ca_client_number = normalized
         else:
             # Auto-generate client number
-            from .auth import generate_next_client_number
             ca_client_number = generate_next_client_number(db)
-    
-    # Generate invitation token for the new user
+
+    # Prepare invitation metadata so the registration link remains valid
     invitation_token = generate_invitation_token()
-    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)  # 7 days expiry
-    
-    # Prepare invitation details for prefilling
+    from datetime import datetime, date
+    invitation_expires_at = datetime.utcnow() + timedelta(days=7)
+
     invitation_details = {}
     if request.first_name:
         invitation_details['first_name'] = request.first_name
@@ -1184,11 +1392,7 @@ async def create_user(
         phone=request.phone,
         is_office_admin=request.is_office_admin,
         status=UserStatus.PENDING_VERIFICATION,
-        password_hash=hash_password("TemporaryPassword123!"),
-        invitation_token=invitation_token,
-        invitation_expires_at=expires_at,
-        invited_by_id=current_user.id,
-        invitation_details=json.dumps(invitation_details) if invitation_details else None,
+        password_hash=hash_password("TemporaryPassword123!"),  # TODO: Send password reset email
         # Contact details - save directly to User model
         title=request.title,
         home_phone=request.home_phone,
@@ -1196,7 +1400,11 @@ async def create_user(
         home_address=request.home_address,
         postcode=request.postcode,
         date_of_birth=request.date_of_birth,
-        gender=request.gender
+        gender=request.gender,
+        invitation_token=invitation_token,
+        invitation_expires_at=invitation_expires_at,
+        invited_by_id=current_user.id,
+        invitation_details=json.dumps(invitation_details) if invitation_details else None
     )
     
     # Debug: Log the contact details being saved
@@ -1222,21 +1430,24 @@ async def create_user(
     print(f"  Postcode: '{new_user.postcode}'")
     print(f"  Date of Birth: '{new_user.date_of_birth}'")
     print(f"  Gender: '{new_user.gender}'")
+    print(f"  ca_client_number: '{new_user.ca_client_number}'")
+
     
     # If this is a client user, also create client details
     if request.role == "client":
         from ..models.client_details import ClientDetails
 
         # Convert date string to date object if provided
+        from datetime import datetime, date
         date_of_birth = None
         if request.date_of_birth:
             try:
-                date_of_birth = dt.datetime.strptime(request.date_of_birth, "%Y-%m-%d").date()
+                date_of_birth = datetime.strptime(request.date_of_birth, "%Y-%m-%d").date()
             except ValueError:
                 # If date parsing fails, use default
-                date_of_birth = dt.date(1900, 1, 1)
+                date_of_birth = date(1900, 1, 1)
         else:
-            date_of_birth = dt.date(1900, 1, 1)
+            date_of_birth = date(1900, 1, 1)
 
         client_details = ClientDetails(
             user_id=new_user.id,
@@ -1255,42 +1466,62 @@ async def create_user(
         db.add(client_details)
         db.commit()
     
-    # Send invitation email
+    # Send user creation email with temporary password
     try:
-        # Send welcome email with password setup instructions
-        user_name = f"{new_user.first_name} {new_user.last_name}".strip() or "User"
-        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
-        
-        # Get office name and code for the email
-        office = db.query(Office).filter(Office.id == office_id).first()
-        office_name = office.name if office else "Citizens Advice Tadley"
+        # Get office info for email
+        office = db.query(Office).filter(Office.id == new_user.office_id).first()
+        office_name = office.name if office else "CA Tadley"
         office_code = office.code if office else "DEFAULT"
-        client_number = ca_client_number or "TBD"
+        print(f"  ca_office_code: '{office_code}'")
+        # Prepare user name for email
+        user_name = ""
+        if new_user.first_name or new_user.last_name:
+            user_name = f"{new_user.first_name or ''} {new_user.last_name or ''}".strip()
         
-        # Create invitation URL with office code and invitation token
-        invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
+        if not user_name:
+            user_name = new_user.email.split('@')[0]
         
-        email_sent = await send_invitation_email(
-            new_user.email, 
-            invitation_token, 
-            inviter_name,
-            invite_url,
-            office_name,
-            client_number
+        # Prepare created by name
+        created_by = ""
+        if current_user.first_name or current_user.last_name:
+            created_by = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip()
+        
+        if not created_by:
+            created_by = current_user.email
+        invite_url = f"{settings.frontend_url}/register?officecode={office_code}&invite={invitation_token}"
+        print(f"invite_url: '{invite_url}'")
+        # Best practice: send role-based invitation email (client vs adviser)
+        from datetime import datetime
+        expires_at = invitation_expires_at if isinstance(invitation_expires_at, datetime) else datetime.utcnow() + timedelta(days=7)
+        email_sent = send_invitation_email(
+            email=new_user.email,
+            invitation_token=invitation_token,
+            user_name=user_name,
+            role=request.role,
+            office_name=office_name,
+            expires_at=expires_at,
+            invited_by_name=created_by,
+            invited_by_role=current_user.role.value,
+            ca_client_number=new_user.ca_client_number,
+            office_code=office_code
         )
         
-        if not email_sent:
-            logger.warning(f"Failed to send welcome email to {new_user.email}")
+        if email_sent:
+            logger.info(f"✅ User creation email sent successfully to {new_user.email}")
+            email_status = "sent"
         else:
-            logger.info(f"Welcome email sent to {new_user.email}")
+            logger.warning(f"⚠️ Failed to send user creation email to {new_user.email}")
+            email_status = "failed"
             
     except Exception as e:
-        logger.error(f"Error sending welcome email: {str(e)}")
+        logger.error(f"❌ Error sending user creation email to {new_user.email}: {str(e)}")
+        email_status = "error"
     
     return {
         "message": f"User {request.email} created successfully",
         "user_id": new_user.id,
-        "client_details_created": request.role == "client"
+        "client_details_created": request.role == "client",
+        "email_status": email_status
     }
 
 @router.post("/invite-user", response_model=InviteLinkResponse)
@@ -1320,7 +1551,7 @@ async def invite_user(
     
     # Generate invitation token
     invitation_token = generate_invitation_token()
-    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)  # 7 days expiry
+    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 days expiry
     
     # Prepare invitation details for prefilling
     invitation_details = {}
@@ -1347,15 +1578,20 @@ async def invite_user(
     
     # Create invitation
     
-    # Auto-generate client number for client users
+    # Auto-generate or validate provided client number for client users
     ca_client_number = None
     if request.role == "client":
         if request.ca_client_number:
-            # If a client number is provided, use it (for manual assignment)
-            ca_client_number = request.ca_client_number
+            # Validate and normalize provided number and ensure uniqueness
+            if not _is_valid_ca_client_number(request.ca_client_number):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid CA client number format. Use CL-#####")
+            normalized = _normalize_ca_client_number(request.ca_client_number)
+            exists = db.query(User).filter(User.ca_client_number == normalized).first()
+            if exists:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CA client number already exists")
+            ca_client_number = normalized
         else:
             # Auto-generate client number
-            from .auth import generate_next_client_number
             ca_client_number = generate_next_client_number(db)
     
     # Create the user with pending status and a temporary password
@@ -1383,38 +1619,92 @@ async def invite_user(
     # Create audit log
     audit_log = AuditLog(
         user_id=current_user.id,
-        action="user_invited",
+            action="invitation_email_sent" if email_sent else "invitation_email_failed",
         resource_type="user",
         resource_id=new_user.id,
-        details=f"Invited {request.role} {request.email} to office {office_id}"
+            details=f"Invitation email {'sent' if email_sent else 'failed'} to {request.email} for role {request.role} in office {office_id}"
     )
     db.add(audit_log)
     db.commit()
     
-    # Get office code for the URL
+    # Get office info for email
     office = db.query(Office).filter(Office.id == office_id).first()
     office_code = office.code if office else "DEFAULT"
+    office_name = office.name if office else "CA Tadley"
     
-    # Generate invite URL with office code
-    invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
+    # Generate invite URL with office code and full domain
+    invite_url = f"{settings.frontend_url}/register?officecode={office_code}&invite={invitation_token}"
     
-    # Send invitation email
+    # Send invitation email using AWS SES SMTP
     try:
-        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
-        email_sent = await send_invitation_email(
-            request.email, 
-            invitation_token, 
-            inviter_name,
-            invite_url
+        # Prepare user name for email
+        user_name = ""
+        if request.first_name or request.last_name:
+            user_name = f"{request.first_name or ''} {request.last_name or ''}".strip()
+        
+        if not user_name:
+            user_name = request.email.split('@')[0]  # Use email prefix as fallback
+        
+        # Send invitation email
+        email_sent = send_invitation_email(
+            email=request.email,
+            invitation_token=invitation_token,
+            user_name=user_name,
+            role=request.role,
+            office_name=office_name,
+            expires_at=expires_at,
+            invited_by_name=f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email.split('@')[0],
+            invited_by_role=current_user.role.value,
+            office_code=office_code
         )
         
-        if not email_sent:
-            logger.warning(f"Failed to send invitation email to {request.email}")
+        if email_sent:
+            print(f"✅ Invitation email sent successfully to {request.email}")
+            
+            # Create audit log for successful email
+            audit_log = AuditLog(
+                user_id=current_user.id,
+                office_id=office_id,
+                action="invitation_email_sent",
+                resource_type="user",
+                resource_id=new_user.id,
+                details=f"Invitation email sent to {request.email} by {current_user.email}"
+            )
+            db.add(audit_log)
+            db.commit()
+            
         else:
-            logger.info(f"Invitation email sent to {request.email}")
+            print(f"⚠️ Failed to send invitation email to {request.email}")
+            
+            # Create audit log for failed email
+            audit_log = AuditLog(
+                user_id=current_user.id,
+                office_id=office_id,
+                action="invitation_email_failed",
+                resource_type="user",
+                resource_id=new_user.id,
+                details=f"Failed to send invitation email to {request.email}"
+            )
+            db.add(audit_log)
+            db.commit()
             
     except Exception as e:
-        logger.error(f"Error sending invitation email: {str(e)}")
+        print(f"❌ Error sending invitation email to {request.email}: {str(e)}")
+        
+        # Create audit log for email error
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            office_id=office_id,
+            action="invitation_email_error",
+            resource_type="user",
+            resource_id=new_user.id,
+            details=f"Error sending invitation email to {request.email}: {str(e)}"
+        )
+        db.add(audit_log)
+        db.commit()
+        
+        # Don't fail the invitation creation if email fails
+        # The invitation link can still be shared manually
     
     return InviteLinkResponse(
         invite_url=invite_url,
@@ -1442,7 +1732,7 @@ async def invite_adviser(
     
     # Generate invitation token
     invitation_token = generate_invitation_token()
-    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)  # 7 days expiry
+    expires_at = datetime.utcnow() + timedelta(days=7)  # 7 days expiry
     
     # Create the user with pending status and a temporary password
     temp_password = secrets.token_urlsafe(16)  # Generate a secure temporary password
@@ -1457,9 +1747,17 @@ async def invite_adviser(
         invitation_token=invitation_token,
         invitation_expires_at=expires_at,
         invited_by_id=current_user.id,
-        password_hash=hash_password(temp_password)  # Set a temporary password hash
+        password_hash=hash_password(temp_password),  # Set a temporary password hash
+        phone=request.phone if hasattr(request, 'phone') else None
     )
     
+    # If a phone was provided, persist it also into invitation_details for prefill
+    if request.phone:
+        try:
+            new_user.invitation_details = json.dumps({"mobile_phone": request.phone, "phone": request.phone})
+        except Exception:
+            new_user.invitation_details = None
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -1475,31 +1773,31 @@ async def invite_adviser(
     db.add(audit_log)
     db.commit()
     
-    # Get office code for the URL
+    # Get office info for URL and email
     office = db.query(Office).filter(Office.id == request.office_id).first()
     office_code = office.code if office else "DEFAULT"
-    
+    office_name = office.name if office else "CA Tadley"
+
     # Generate invite URL with office code
-    invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
-    
-    # Send invitation email
+    invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
+
+    # Send adviser invitation email using the adviser template
     try:
-        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
-        email_sent = await send_invitation_email(
-            request.email, 
-            invitation_token, 
-            inviter_name,
-            invite_url
+        user_name = f"{request.first_name} {request.last_name}".strip() or request.email.split('@')[0]
+        send_invitation_email(
+            email=request.email,
+            invitation_token=invitation_token,
+            user_name=user_name,
+            role=UserRole.ADVISER.value,
+            office_name=office_name,
+            expires_at=expires_at,
+            invited_by_name=f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email.split('@')[0],
+            invited_by_role=current_user.role.value
         )
-        
-        if not email_sent:
-            logger.warning(f"Failed to send invitation email to {request.email}")
-        else:
-            logger.info(f"Invitation email sent to {request.email}")
-            
-    except Exception as e:
-        logger.error(f"Error sending invitation email: {str(e)}")
-    
+    except Exception:
+        # Do not fail endpoint if email sending fails; link can be shared manually
+        pass
+
     return InviteLinkResponse(
         invite_url=invite_url,
         expires_at=expires_at,
@@ -1534,7 +1832,7 @@ async def reinvite_user(
 
     # Generate new token and expiry
     invitation_token = generate_invitation_token()
-    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)
+    expires_at = datetime.utcnow() + timedelta(days=7)
 
     user.invitation_token = invitation_token
     user.invitation_expires_at = expires_at
@@ -1549,25 +1847,7 @@ async def reinvite_user(
     office_code = office.code if office else "DEFAULT"
     
     # Generate invite URL with office code
-    invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
-
-    # Send reinvitation email
-    try:
-        inviter_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Administrator"
-        email_sent = await send_invitation_email(
-            user.email, 
-            invitation_token, 
-            inviter_name,
-            invite_url
-        )
-        
-        if not email_sent:
-            logger.warning(f"Failed to send reinvitation email to {user.email}")
-        else:
-            logger.info(f"Reinvitation email sent to {user.email}")
-            
-    except Exception as e:
-        logger.error(f"Error sending reinvitation email: {str(e)}")
+    invite_url = f"/register?officecode={office_code}&invite={invitation_token}"
 
     return InviteLinkResponse(
         invite_url=invite_url,
@@ -1595,7 +1875,7 @@ async def generate_invite_for_user(
 
     # Generate new token and expiry
     invitation_token = generate_invitation_token()
-    expires_at = dt.datetime.utcnow() + dt.timedelta(days=7)
+    expires_at = datetime.utcnow() + timedelta(days=7)
 
     # Prepare invitation details from user's existing data
     invitation_details = {}
@@ -1630,12 +1910,84 @@ async def generate_invite_for_user(
     db.commit()
     db.refresh(user)
 
-    # Get office code for the URL
+    # Get office info for email
     office = db.query(Office).filter(Office.id == user.office_id).first()
     office_code = office.code if office else "DEFAULT"
+    office_name = office.name if office else "CA Tadley"
     
-    # Generate invite URL with office code
-    invite_url = f"/register?office_code={office_code}&invite={invitation_token}"
+    # Generate invite URL with office code and full domain
+    invite_url = f"{settings.frontend_url}/register?officecode={office_code}&invite={invitation_token}"
+
+    # Send invitation email using AWS SES SMTP
+    try:
+        # Prepare user name for email
+        user_name = ""
+        if user.first_name or user.last_name:
+            user_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        
+        if not user_name:
+            user_name = user.email.split('@')[0]  # Use email prefix as fallback
+        
+        # Send invitation email
+        email_sent = send_invitation_email(
+            email=user.email,
+            invitation_token=invitation_token,
+            user_name=user_name,
+            role=user.role.value,
+            office_name=office_name,
+            expires_at=expires_at,
+            invited_by_name=f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email.split('@')[0],
+            invited_by_role=current_user.role.value,
+            office_code=office_code
+        )
+        
+        if email_sent:
+            print(f"✅ Invitation email sent successfully to {user.email}")
+            
+            # Create audit log for successful email
+            audit_log = AuditLog(
+                user_id=current_user.id,
+                office_id=current_user.office_id,
+                action="invitation_email_sent",
+                resource_type="user",
+                resource_id=user.id,
+                details=f"Invitation email sent to {user.email} by {current_user.email}"
+            )
+            db.add(audit_log)
+            db.commit()
+            
+        else:
+            print(f"⚠️ Failed to send invitation email to {user.email}")
+            
+            # Create audit log for failed email
+            audit_log = AuditLog(
+                user_id=current_user.id,
+                office_id=current_user.office_id,
+                action="invitation_email_failed",
+                resource_type="user",
+                resource_id=user.id,
+                details=f"Failed to send invitation email to {user.email}"
+            )
+            db.add(audit_log)
+            db.commit()
+            
+    except Exception as e:
+        print(f"❌ Error sending invitation email to {user.email}: {str(e)}")
+        
+        # Create audit log for email error
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            office_id=current_user.office_id,
+            action="invitation_email_error",
+            resource_type="user",
+            resource_id=user.id,
+            details=f"Error sending invitation email to {user.email}: {str(e)}"
+        )
+        db.add(audit_log)
+        db.commit()
+        
+        # Don't fail the invitation creation if email fails
+        # The invitation link can still be shared manually
 
     return InviteLinkResponse(
         invite_url=invite_url,
@@ -1662,7 +2014,7 @@ async def validate_invitation(
             detail="Invalid or expired invitation link"
         )
     
-    if user.invitation_expires_at < dt.datetime.utcnow():
+    if user.invitation_expires_at < datetime.utcnow():
         # Invitation expired
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1728,7 +2080,7 @@ async def accept_invitation(
             detail="Invalid or expired invitation link"
         )
     
-    if user.invitation_expires_at < dt.datetime.utcnow():
+    if user.invitation_expires_at < datetime.utcnow():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invitation link has expired"
@@ -1758,11 +2110,11 @@ async def accept_invitation(
     user.invitation_token = None
     user.invitation_expires_at = None
     user.email_verified = True
-    user.email_verified_at = dt.datetime.utcnow()
+    user.email_verified_at = datetime.utcnow()
     
     # Update last_login and last_activity since this is effectively a login
-    user.last_login = dt.datetime.utcnow()
-    user.last_activity = dt.datetime.utcnow()
+    user.last_login = datetime.utcnow()
+    user.last_activity = datetime.utcnow()
     
     db.commit()
     
@@ -2048,9 +2400,21 @@ async def delete_case(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a case (superuser only)"""
+    """Delete a case (advisers only)"""
     
-    require_superuser_access(current_user)
+    # Block superusers from deleting cases
+    if current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Superusers are not permitted to delete cases"
+        )
+    
+    # Allow advisers (including office admins)
+    if not (current_user.role == UserRole.ADVISER):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
     
     # Find the case
     case = db.query(Case).filter(Case.id == case_id).first()
@@ -2083,7 +2447,33 @@ async def delete_case(
             print(f"⚠️ File cleanup error for case {case_id}: {file_cleanup_result['error']}")
             # Continue with case deletion even if some files couldn't be deleted
         
-        # Delete the case (cascade will handle related records)
+        # Explicitly delete financial/related records to avoid FK constraint errors when cascades are not present
+        try:
+            from ..models.debt import Debt
+            from ..models.asset import Asset
+            from ..models.income import Income
+            from ..models.expenditure import Expenditure
+            from ..models.file_upload import FileUpload
+            from ..models.notification import Notification
+            
+            db.query(Debt).filter(Debt.case_id == case.id).delete()
+            db.query(Asset).filter(Asset.case_id == case.id).delete()
+            db.query(Income).filter(Income.case_id == case.id).delete()
+            db.query(Expenditure).filter(Expenditure.case_id == case.id).delete()
+            db.query(FileUpload).filter(FileUpload.case_id == case.id).delete()
+            db.query(Notification).filter(Notification.case_id == case.id).delete()
+
+            # Null out case_id in audit logs to avoid FK constraint errors
+            try:
+                db.query(AuditLog).filter(AuditLog.case_id == case.id).update({AuditLog.case_id: None})
+            except Exception as audit_err:
+                print(f"⚠️ AuditLog nullification error for case {case_id}: {str(audit_err)}")
+            db.flush()
+        except Exception as rel_err:
+            # If related record deletion fails, log and continue; DB constraints may still allow case delete
+            print(f"⚠️ Related record cleanup error for case {case_id}: {str(rel_err)}")
+        
+        # Delete the case record
         db.delete(case)
         db.commit()
         
@@ -2132,9 +2522,21 @@ async def update_case(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update case details (admin only)"""
+    """Update case details (advisers only)"""
     
-    require_admin_access(current_user)
+    # Block superusers from updating cases
+    if current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Superusers are not permitted to update cases"
+        )
+    
+    # Allow advisers (including office admins)
+    if not (current_user.role == UserRole.ADVISER):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
     
     # Find the case
     case = db.query(Case).filter(Case.id == case_id).first()
@@ -2249,6 +2651,8 @@ async def update_case(
     
     # Create notifications based on changes
     notifications_created = []
+    message_parts = []  # Initialize message parts for notifications
+    has_meaningful_changes = False
     
     try:
         # Handle case status changes
@@ -2437,6 +2841,8 @@ async def reactivate_user(
         "status": user.status.value
     }
 
+from ..models.user import UserRole
+
 @router.get("/logs/auth")
 async def get_authentication_logs(
     current_user: User = Depends(get_current_user),
@@ -2466,11 +2872,16 @@ async def get_authentication_logs(
         # Client setup
         "client_account_setup",
         
+        # Adviser setup
+        "adviser_invited",
+        "user_invited",  # Added to capture adviser invites through general invite
+        "invitation_accepted",  # Added to capture adviser registrations
+        
         # 2FA actions
         "totp_enabled", "totp_disabled", "totp_verified", "totp_failed",
         
         # Admin/Security actions
-        "user_invited", "user_role_changed", "superuser_access_granted", 
+        "user_role_changed", "superuser_access_granted", 
         "superuser_access_revoked",
         
         # System actions
@@ -2487,7 +2898,7 @@ async def get_authentication_logs(
     
     if start_date:
         try:
-            start_dt = dt.datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
             query = query.filter(AuditLog.created_at >= start_dt)
         except ValueError:
             raise HTTPException(
@@ -2497,7 +2908,7 @@ async def get_authentication_logs(
     
     if end_date:
         try:
-            end_dt = dt.datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
             query = query.filter(AuditLog.created_at <= end_dt)
         except ValueError:
             raise HTTPException(
@@ -2506,13 +2917,66 @@ async def get_authentication_logs(
             )
     
     if action_type:
-        query = query.filter(AuditLog.action == action_type)
+        # Special handling to surface adviser setup events even when they were logged as generic user_invited
+        if action_type == "adviser_invited":
+            # Get both invitation and acceptance events for advisers
+            query = (
+                query.outerjoin(User, or_(AuditLog.resource_id == User.id, AuditLog.user_id == User.id))
+                .filter(
+                    or_(
+                        # Get both user_invited and invitation_accepted events for advisers
+                        and_(
+                            AuditLog.action.in_(["user_invited", "invitation_accepted"]),
+                            or_(
+                                User.role == UserRole.ADVISER,
+                                # Also check the description for adviser mentions since older entries might not have the role preserved
+                                AuditLog.description.ilike('%adviser%'),
+                                # Check details field for adviser role mentions - cast JSON to text first
+                                AuditLog.details.cast(String).ilike('%"role": "adviser"%')
+                            )
+                        ),
+                        # Also include any explicit adviser invites
+                        AuditLog.action == "adviser_invited"
+                    )
+                )
+            )
+        # Special handling to surface client setup events (invites + acceptances + explicit)
+        elif action_type == "client_account_setup":
+            query = (
+                query.outerjoin(User, or_(AuditLog.resource_id == User.id, AuditLog.user_id == User.id))
+                .filter(
+                    or_(
+                        and_(
+                            AuditLog.action.in_(["user_invited", "invitation_accepted"]),
+                            or_(
+                                User.role == UserRole.CLIENT,
+                                AuditLog.description.ilike('%client%'),
+                                AuditLog.details.cast(String).ilike('%"role": "client"%')
+                            )
+                        ),
+                        AuditLog.action == "client_account_setup"
+                    )
+                )
+            )
+        elif action_type == "account_unlocked":
+            # Include both explicit unlocks and activations under the same filter
+            query = query.filter(AuditLog.action.in_(["account_unlocked", "account_activated"]))
+        else:
+            query = query.filter(AuditLog.action == action_type)
     
-    # Get total count
-    total_count = query.count()
-    
-    # Apply pagination and ordering - newest first, then by action type for consistency
-    logs = query.order_by(AuditLog.created_at.desc(), AuditLog.action.asc()).offset(offset).limit(limit).all()
+    try:
+        # Get total count
+        total_count = query.count()
+        
+        # Apply pagination and ordering - newest first, then by action type for consistency
+        logs = query.order_by(AuditLog.created_at.desc(), AuditLog.action.asc()).offset(offset).limit(limit).all()
+    except Exception as e:
+        print(f"Error in get_authentication_logs: {str(e)}")  # Log the error
+        print(f"SQL Query: {query}")  # Log the query
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch authentication logs: {str(e)}"
+        )
     
     # Helper function to clean up descriptions
     def clean_description(description, action):
@@ -2582,6 +3046,15 @@ async def get_authentication_logs(
     # Format response
     result = []
     for log in logs:
+        # Compute display description with legacy text normalization
+        display_description = clean_description(log.description, log.action)
+        if log.action == "invitation_accepted" and display_description.startswith("Invited user registered"):
+            try:
+                role_display = "adviser" if (log.user and getattr(log.user.role, "value", str(log.user.role)).lower() == "adviser") else "client"
+            except Exception:
+                role_display = "client"
+            display_description = display_description.replace("Invited user registered", f"Invited {role_display} registered", 1)
+
         result.append({
             "id": log.id,
             "timestamp": log.created_at.isoformat(),
@@ -2595,10 +3068,15 @@ async def get_authentication_logs(
             "ip_address": log.ip_address,
             "user_agent": log.user_agent,
             "success": log.success == "True",
-            "description": clean_description(log.description, log.action),
+            "description": display_description,
             "details": log.details,
             "error_message": log.error_message,
-            "is_security_event": log.is_security_event
+            "is_security_event": log.is_security_event,
+            "resource_type": log.resource_type,
+            "resource_id": log.resource_id,
+            "file_id": log.file_id,
+            "filename": log.filename or (log.file.original_filename if getattr(log, "file", None) else None),
+            "case_id": log.case_id
         })
     
     return {

@@ -1,0 +1,300 @@
+<!-- Base Email Styles for Citizens Advice -->
+<!-- Brand Colors:
+  Primary Blue: #004b88 (ca-blue-700)
+  Medium Blue: #0066cc (ca-blue-600) 
+  Light Blue: #3399ff (ca-blue-400)
+  Success Green: #16a34a (ca-green-600)
+  Warning Orange: #ea580c (ca-orange-600)
+  Gray Text: #4b5563 (ca-gray-600)
+  Light Gray: #f3f4f6 (ca-gray-100)
+-->
+
+<style>
+  /* Reset and base styles */
+  body {
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    color: #4b5563;
+    margin: 0;
+    padding: 0;
+    background-color: #f3f4f6;
+  }
+  
+  .email-container {
+    max-width: 600px;
+    margin: 20px auto;
+    background-color: #ffffff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Header with CA branding */
+  .email-header {
+    background: linear-gradient(135deg, #004b88 0%, #0066cc 100%);
+    color: #ffffff;
+    padding: 30px 20px;
+    text-align: center;
+  }
+  
+  .email-header h1 {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+  
+  .email-header .subtitle {
+    margin: 0;
+    font-size: 16px;
+    opacity: 0.9;
+    font-weight: 400;
+  }
+  
+  .ca-logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 5px;
+    letter-spacing: 0.5px;
+  }
+  
+  /* Content area */
+  .email-content {
+    padding: 40px 30px;
+  }
+  
+  .email-content h2 {
+    color: #004b88;
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+  }
+  
+  .email-content h3 {
+    color: #0066cc;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 25px 0 15px 0;
+  }
+  
+  .email-content p {
+    margin: 0 0 16px 0;
+    color: #4b5563;
+    font-size: 16px;
+  }
+  
+  .email-content ul, .email-content ol {
+    margin: 16px 0 16px 20px;
+    color: #4b5563;
+  }
+  
+  /* Buttons */
+  .ca-button {
+    display: inline-block;
+    background: linear-gradient(135deg, #004b88 0%, #0066cc 100%);
+    color: #ffffff !important;
+    padding: 14px 28px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 16px;
+    text-align: center;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .ca-button:hover {
+    background: linear-gradient(135deg, #003366 0%, #004b88 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 75, 136, 0.3);
+  }
+  
+  .ca-button-success {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  }
+  
+  .ca-button-success:hover {
+    background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+  }
+  
+  .ca-button-warning {
+    background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+  }
+  
+  .ca-button-warning:hover {
+    background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);
+  }
+  
+  /* Info boxes */
+  .info-box {
+    background-color: #f0f8ff;
+    border: 1px solid #3399ff;
+    border-left: 4px solid #0066cc;
+    padding: 20px;
+    border-radius: 6px;
+    margin: 25px 0;
+  }
+  
+  .info-box h3 {
+    color: #004b88;
+    margin-top: 0;
+    margin-bottom: 15px;
+  }
+  
+  .success-box {
+    background-color: #f0fdf4;
+    border: 1px solid #22c55e;
+    border-left: 4px solid #16a34a;
+  }
+  
+  .success-box h3 {
+    color: #15803d;
+  }
+  
+  .warning-box {
+    background-color: #fffbeb;
+    border: 1px solid #f97316;
+    border-left: 4px solid #ea580c;
+  }
+  
+  .warning-box h3 {
+    color: #c2410c;
+  }
+  
+  /* Special elements */
+  .code-display {
+    background: linear-gradient(135deg, #004b88 0%, #0066cc 100%);
+    color: #ffffff;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    text-align: center;
+    padding: 25px 20px;
+    border-radius: 8px;
+    margin: 25px 0;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 4px 8px rgba(0, 75, 136, 0.2);
+  }
+  
+  .credentials-box {
+    background-color: #f8fafc;
+    border: 2px solid #0066cc;
+    border-radius: 8px;
+    padding: 25px;
+    margin: 25px 0;
+    text-align: center;
+  }
+  
+  .credentials-box h3 {
+    color: #004b88;
+    margin-top: 0;
+    margin-bottom: 20px;
+  }
+  
+  .credential-item {
+    margin: 12px 0;
+    font-size: 16px;
+  }
+  
+  .credential-label {
+    font-weight: 600;
+    color: #374151;
+  }
+  
+  .credential-value {
+    font-family: 'Courier New', monospace;
+    background-color: #e5e7eb;
+    padding: 6px 12px;
+    border-radius: 4px;
+    margin-left: 10px;
+    color: #1f2937;
+  }
+  
+  /* Footer */
+  .email-footer {
+    background-color: #f8fafc;
+    padding: 30px 20px;
+    text-align: center;
+    border-top: 1px solid #e5e7eb;
+  }
+  
+  .email-footer p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #6b7280;
+  }
+  
+  .email-footer .company-name {
+    font-weight: 600;
+    color: #004b88;
+    font-size: 16px;
+  }
+  
+  .contact-info {
+    background-color: #f0f8ff;
+    padding: 20px;
+    border-radius: 6px;
+    margin: 25px 0;
+    border-left: 4px solid #0066cc;
+  }
+  
+  .contact-info h4 {
+    color: #004b88;
+    margin-top: 0;
+    margin-bottom: 15px;
+  }
+  
+  /* Responsive styles */
+  @media only screen and (max-width: 600px) {
+    .email-container {
+      margin: 10px;
+      border-radius: 6px;
+    }
+    
+    .email-header, .email-content, .email-footer {
+      padding: 20px 15px;
+    }
+    
+    .ca-button {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .code-display {
+      font-size: 24px;
+      letter-spacing: 4px;
+    }
+  }
+  
+  /* Link styles */
+  a {
+    color: #0066cc;
+    text-decoration: none;
+  }
+  
+  a:hover {
+    color: #004b88;
+    text-decoration: underline;
+  }
+  
+  /* Utility classes */
+  .text-center {
+    text-align: center;
+  }
+  
+  .margin-large {
+    margin: 30px 0;
+  }
+  
+  .no-margin-top {
+    margin-top: 0;
+  }
+  
+  .small-text {
+    font-size: 14px;
+    color: #6b7280;
+  }
+</style>

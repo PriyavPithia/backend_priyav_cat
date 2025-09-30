@@ -25,6 +25,14 @@ except ImportError:
 from ..config.settings import settings
 from ..config.logging import get_logger
 
+# Import S3 utilities (with fallback if not available)
+try:
+    from .s3_utils import s3_handler
+    S3_AVAILABLE = True
+except ImportError:
+    s3_handler = None
+    S3_AVAILABLE = False
+
 # Initialize logger for this module
 logger = get_logger('file_utils')
 
@@ -34,7 +42,7 @@ if _HEIF_AVAILABLE:
 
 # File encryption
 def generate_encryption_key() -> bytes:
-    """Generate encryption key for file encryption"""
+    """Generate encryption key for file encryption."""
     return Fernet.generate_key()
 
 def encrypt_file_content(content: bytes, key: bytes) -> bytes:
@@ -546,24 +554,52 @@ def get_upload_requirements():
     }
 
 async def create_files_zip(file_records: List, upload_dir: str) -> bytes:
-    """
-    Create a ZIP file containing all specified files
-    Returns ZIP file content as bytes
-    """
+    """Create a ZIP archive for the supplied records from either S3 or local storage."""
     zip_buffer = io.BytesIO()
     
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for file_record in file_records:
             try:
-                full_file_path = os.path.join(upload_dir, file_record.file_path)
-                
-                if os.path.exists(full_file_path):
-                    # Read file content (decrypt if necessary)
-                    file_content = await read_uploaded_file(
-                        full_file_path, 
-                        file_record.encryption_key_id if file_record.is_encrypted else None
+                file_content = None
+                from_s3 = False
+                s3_key = (
+                    getattr(file_record, 's3_key', None)
+                    or (
+                        getattr(file_record, 'storage_type', None) == 's3'
+                        and getattr(file_record, 'file_path', None)
                     )
-                    
+                )
+
+                # Try S3 first when we know the file lives there
+                if not file_content and s3_key and S3_AVAILABLE and s3_handler.config.is_available:
+                    try:
+                        file_content = s3_handler.download_file(s3_key)
+                        from_s3 = file_content is not None
+                    except Exception as s3_error:
+                        logger.error(f"Failed to download {s3_key} from S3: {s3_error}")
+                        file_content = None
+
+                # Fallback to local storage when present
+                if not file_content:
+                    full_file_path = file_record.file_path
+                    if full_file_path and not os.path.isabs(full_file_path):
+                        full_file_path = os.path.join(upload_dir, full_file_path)
+
+                    if full_file_path and os.path.exists(full_file_path):
+                        file_content = await read_uploaded_file(
+                            full_file_path,
+                            file_record.encryption_key_id if file_record.is_encrypted else None
+                        )
+                        from_s3 = False
+
+                if file_content:
+                    if file_record.is_encrypted and file_record.encryption_key_id and from_s3:
+                        # Content downloaded from S3 arrives encrypted; decrypt it now
+                        file_content = decrypt_file_content(
+                            file_content,
+                            file_record.encryption_key_id.encode()
+                        )
+
                     # Add to ZIP with stored filename (includes client prefix and proper naming)
                     display_filename = file_record.original_filename
                     if file_record.was_converted and file_record.original_filename.lower().endswith('.heic'):
@@ -580,14 +616,14 @@ async def create_files_zip(file_records: List, upload_dir: str) -> bytes:
                     elif file_record.stored_filename:
                         # Use stored filename which includes client prefix
                         display_filename = file_record.stored_filename
-                    
+
                     zip_file.writestr(display_filename, file_content)
                 else:
                     # Add placeholder for missing files
                     display_filename = file_record.stored_filename or file_record.original_filename
                     zip_file.writestr(
-                        f"MISSING_{display_filename}.txt", 
-                        f"File '{display_filename}' was not found on disk."
+                        f"MISSING_{display_filename}.txt",
+                        f"File '{display_filename}' was not found in storage."
                     )
             except Exception as e:
                 # Add error info for failed files
@@ -741,3 +777,209 @@ async def delete_case_files(case_id: str, db_session) -> dict:
     except Exception as e:
         deletion_summary["error"] = f"Failed to delete case files: {str(e)}"
         return deletion_summary
+
+
+class HybridFileStorage:
+    """S3-first file storage - fails if S3 is not available or upload fails."""
+    
+    def __init__(self):
+        self.use_s3 = S3_AVAILABLE and s3_handler and s3_handler.config.is_available
+        if not self.use_s3:
+            logger.error("S3 storage is not available - file uploads will fail")
+        else:
+            logger.info("File storage mode: S3-only (no local fallback)")
+    
+    async def save_file(
+        self, 
+        file: UploadFile, 
+        case_id: str,
+        uploaded_by_id: str,
+        client_id: Optional[str] = None,
+        encrypt: bool = True,
+        category: str = "other"
+    ) -> Tuple[bool, str, Optional[str], dict]:
+        """
+        Save file to S3 storage only - fails if S3 is not available or upload fails
+        
+        Returns:
+            tuple: (success, local_path, s3_key, metadata)
+        """
+        # Check if S3 is available
+        if not self.use_s3 or not s3_handler:
+            logger.error("S3 storage is not available - cannot save file")
+            raise ValueError("S3 storage is not configured or unavailable")
+        
+        # Process file locally to get metadata (but don't save to disk)
+        try:
+            # Read file content
+            content = await file.read()
+            original_filename = file.filename
+            
+            # Validate file type
+            is_allowed, type_message = is_allowed_file_type(original_filename)
+            if not is_allowed:
+                raise ValueError(type_message)
+            
+            # Validate file size
+            is_size_ok, size_message = is_file_size_allowed(len(content))
+            if not is_size_ok:
+                raise ValueError(size_message)
+            
+            # Handle HEIC conversion if needed
+            file_extension = os.path.splitext(original_filename)[1].lower()
+            converted_filename = original_filename
+            
+            if file_extension == '.heic':
+                logger.debug("HEIC file detected, starting conversion...")
+                try:
+                    file_size_mb = len(content) / (1024 * 1024)
+                    if file_size_mb > 5:  # Use async for files larger than 5MB
+                        content, file_extension = await convert_heic_async(
+                            content,
+                            max_dimension=settings.heic_max_dimension,
+                            quality=settings.heic_quality,
+                            use_jpeg=settings.heic_use_jpeg
+                        )
+                    else:
+                        if settings.heic_use_jpeg:
+                            content, file_extension = convert_heic_to_jpeg(
+                                content, 
+                                max_dimension=settings.heic_max_dimension, 
+                                quality=settings.heic_quality
+                            )
+                        else:
+                            content, file_extension = convert_heic_to_png(
+                                content, 
+                                max_dimension=settings.heic_max_dimension, 
+                                quality=settings.heic_quality
+                            )
+                    
+                    # Update filename to reflect conversion
+                    converted_ext = '.jpg' if settings.heic_use_jpeg else '.png'
+                    base_name = os.path.splitext(original_filename)[0]
+                    converted_filename = f"{base_name}{converted_ext}"
+                    logger.debug(f"HEIC conversion completed, new filename: {converted_filename}")
+                    
+                except ValueError as e:
+                    logger.error(f"HEIC conversion failed: {str(e)}")
+                    raise ValueError(f"HEIC conversion failed: {str(e)}")
+            
+            # Generate secure filename with client ID prefix
+            secure_filename = generate_secure_filename(converted_filename, client_id)
+            
+            # Get file hash before encryption
+            file_hash = get_file_hash(content)
+            
+            # Encrypt content if required
+            encryption_key = None
+            if encrypt:
+                logger.debug("Encrypting file content...")
+                encryption_key = generate_encryption_key()
+                content = encrypt_file_content(content, encryption_key)
+            
+            # Create S3 key with CASE_FILES folder structure
+            s3_key = f"CASE_FILES/{client_id or case_id}/{category}/{secure_filename}"
+            
+            # Upload to S3 using BytesIO
+            import io
+            file_obj = io.BytesIO(content)
+            s3_success = s3_handler.upload_file(
+                file_obj, 
+                s3_key, 
+                get_file_mime_type(content) if not encrypt else 'application/octet-stream'
+            )
+            
+            if not s3_success:
+                logger.error(f"S3 upload failed for file: {file.filename}")
+                raise ValueError(f"Failed to upload file to S3: {file.filename}")
+            
+            logger.info(f"File successfully uploaded to S3: {s3_key}")
+            
+            # Create metadata
+            metadata = {
+                'original_filename': original_filename,
+                'stored_filename': secure_filename,
+                'file_path': s3_key,  # Store S3 key as file path
+                'file_size': len(content),
+                'file_extension': file_extension,
+                'mime_type': get_file_mime_type(content) if not encrypt else 'application/octet-stream',
+                'file_hash': file_hash,
+                'is_encrypted': encrypt,
+                'encryption_key': encryption_key.decode() if encryption_key else None,
+                'category': category,
+                'was_converted': file_extension in ['.png', '.jpg'] and original_filename.lower().endswith('.heic'),
+                'storage_type': 's3_only',
+                's3_key': s3_key
+            }
+            
+            return True, s3_key, s3_key, metadata
+            
+        except Exception as e:
+            logger.error(f"File upload to S3 failed: {str(e)}")
+            raise ValueError(f"File upload failed: {str(e)}")
+    
+    def get_file(self, s3_key: str) -> Optional[bytes]:
+        """
+        Get file content from S3 storage only
+        """
+        if not self.use_s3 or not s3_handler:
+            logger.error("S3 storage is not available - cannot retrieve file")
+            raise ValueError("S3 storage is not configured or unavailable")
+        
+        try:
+            content = s3_handler.download_file(s3_key)
+            if content:
+                logger.debug(f"File retrieved from S3: {s3_key}")
+                return content
+            else:
+                logger.error(f"File not found in S3: {s3_key}")
+                raise ValueError(f"File not found in S3: {s3_key}")
+        except Exception as e:
+            logger.error(f"S3 download error: {e}")
+            raise ValueError(f"Failed to download file from S3: {str(e)}")
+    
+    def delete_file(self, s3_key: str) -> bool:
+        """
+        Delete file from S3 storage only
+        """
+        if not self.use_s3 or not s3_handler:
+            logger.error("S3 storage is not available - cannot delete file")
+            raise ValueError("S3 storage is not configured or unavailable")
+        
+        try:
+            s3_success = s3_handler.delete_file(s3_key)
+            if not s3_success:
+                logger.error(f"Failed to delete from S3: {s3_key}")
+                raise ValueError(f"Failed to delete file from S3: {s3_key}")
+            
+            logger.info(f"File deleted from S3: {s3_key}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"S3 deletion error: {e}")
+            raise ValueError(f"Failed to delete file from S3: {str(e)}")
+    
+    def get_download_url(self, s3_key: str) -> str:
+        """
+        Get presigned download URL for S3 file
+        """
+        if not self.use_s3 or not s3_handler:
+            logger.error("S3 storage is not available - cannot generate download URL")
+            raise ValueError("S3 storage is not configured or unavailable")
+        
+        try:
+            if s3_handler.file_exists(s3_key):
+                url = s3_handler.generate_presigned_url(s3_key)
+                if url:
+                    return url
+                else:
+                    raise ValueError(f"Failed to generate presigned URL for: {s3_key}")
+            else:
+                raise ValueError(f"File not found in S3: {s3_key}")
+        except Exception as e:
+            logger.error(f"Error generating presigned URL: {e}")
+            raise ValueError(f"Failed to generate download URL: {str(e)}")
+
+
+# Global hybrid storage instance
+hybrid_storage = HybridFileStorage()

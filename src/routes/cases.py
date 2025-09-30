@@ -11,6 +11,8 @@ from ..models import User, Case, CaseStatus, CasePriority, Debt, Asset, Income, 
 from ..utils.frequency_utils import normalize_frequency, get_frequency_multiplier
 from .auth import get_current_user
 from ..utils.auth import get_client_ip_address
+from ..services.email_service import send_submission_notification_to_office
+from ..config.settings import settings
 
 router = APIRouter()
 
@@ -402,6 +404,17 @@ async def submit_case(
         details=f"Case submitted for review by client {current_user.email}",
         ip_address=get_client_ip_address(request)
     )
+    # Notify office via email (best-effort)
+    try:
+        office_name = current_user.office.name if current_user.office else "CA Tadley"
+        send_submission_notification_to_office(
+            office_name=office_name,
+            ca_client_number=current_user.ca_client_number,
+            submission_date=datetime.utcnow(),
+            case_review_link=f"{settings.frontend_url}/case/{case.id}",
+        )
+    except Exception:
+        pass
     
     return {"message": "Case submitted successfully"}
 
@@ -680,6 +693,44 @@ async def auto_save_case_data(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save case data: {str(e)}"
         )
+
+@router.post("/reopen-case")
+async def reopen_case(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Allow a client to reopen their submitted case for further editing.
+
+    Sets status back to PENDING and clears submitted_at. Does not alter any data.
+    """
+    if not current_user.is_client:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only clients can access this endpoint"
+        )
+
+    case = db.query(Case).filter(Case.client_id == current_user.id).first()
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No case found for this user"
+        )
+
+    if case.status != CaseStatus.SUBMITTED:
+        # No-op if not in submitted state
+        return {"message": "Case is not submitted; no changes made", "status": case.status.value}
+
+    # Reopen for edits
+    case.status = CaseStatus.PENDING
+    try:
+        # Some schemas might not have submitted_at; ignore if missing
+        setattr(case, 'submitted_at', None)
+    except Exception:
+        pass
+
+    db.commit()
+
+    return {"message": "Case reopened for editing", "status": case.status.value}
 
 @router.get("/validate-postcode/{postcode}", name="validate_postcode")
 async def validate_postcode(

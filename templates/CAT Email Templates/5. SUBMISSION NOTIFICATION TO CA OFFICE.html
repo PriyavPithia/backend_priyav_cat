@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Submission Complete - Citizens Advice Tadley</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Open Sans', Arial, sans-serif; background-color: #f9fafb;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f9fafb;">
+        <tr>
+            <td style="padding: 40px 20px;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #ffffff; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; border-bottom: 3px solid #004b88;">
+                            <img src="https://www.catadley.org/images/cablogonew.png" alt="Citizens Advice Tadley Logo" style="height: 70px; margin-bottom: 20px;">
+                            <h1 style="color: #004b88; margin: 0; font-size: 24px; font-weight: bold;">Client Submission Complete</h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h2 style="color: #004b88; margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Assessment Submitted</h2>
+                            
+                            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+                                A client has completed and submitted their financial assessment. The case is now ready for review.
+                            </p>
+                            
+                            <div style="background-color: #e6f2ff; border-left: 4px solid #004b88; padding: 20px; margin: 30px 0; border-radius: 4px;">
+                                <p style="margin: 0; color: #004b88; font-weight: 600; font-size: 16px;">
+                                    <strong>Submission Details:</strong><br>
+                                    CA Client Number: {{ ca_client_number }}<br>
+                                    Submission Date: {{ submission_date }}<br>
+                                </p>
+                            </div>
+                            
+                            <div style="text-align: center; margin: 40px 0;">
+                                <a href="{{ case_review_link }}" style="display: inline-block; background-color: #004b88; color: #ffffff; text-decoration: none; padding: 15px 30px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                                    Review Case
+                                </a>
+                            </div>
+                            
+                            <p style="color: #374151; margin: 0 0 20px 0; font-size: 16px; line-height: 1.6;">
+                                The client has been notified that their submission has been received and is being reviewed.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f3f4f6; padding: 30px; text-align: center; border-radius: 0 0 8px 8px;">
+                            <p style="color: #6b7280; margin: 0; font-size: 14px;">
+                                Citizens Advice Tadley - {{ ca_office }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
