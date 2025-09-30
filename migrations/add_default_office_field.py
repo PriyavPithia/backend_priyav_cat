@@ -22,19 +22,9 @@ def migrate():
     db = SessionLocal()
     
     try:
-        # Check if column already exists
-        result = db.execute(text("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'offices' AND column_name = 'is_default'
-        """)).fetchone()
-        
-        if result:
-            print("✅ is_default column already exists in offices table")
-        else:
-            # Add the is_default column
-            db.execute(text("ALTER TABLE offices ADD COLUMN is_default BOOLEAN DEFAULT FALSE"))
-            print("✅ Added is_default column to offices table")
+        # Add the is_default column
+        db.execute(text("ALTER TABLE offices ADD COLUMN is_default BOOLEAN DEFAULT FALSE"))
+        print("✅ Added is_default column to offices table")
         
         # Set the first office as default
         first_office = db.query(Office).order_by(Office.created_at).first()

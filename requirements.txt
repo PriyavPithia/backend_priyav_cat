@@ -18,7 +18,9 @@ httpx==0.28.0  # For API calls and TestClient
 pytest==8.3.4
 pytest-asyncio==0.24.0
 python-dotenv==1.0.1
-pillow-heif==0.17.0
+# Optional: HEIF/HEIC support. Commented to avoid build failures on platforms without libheif.
+# Install only if needed: pip install pillow-heif==0.17.0
+# pillow-heif==0.17.0
 zipfile36==0.1.3
 # fastapi-csrf-protect==0.1.0  # Incompatible with newer FastAPI versions
 slowapi==0.1.9  # For rate limiting
@@ -29,4 +31,3 @@ psycopg2-binary==2.9.9  # PostgreSQL driver for production
 # S3 and cloud storage
 boto3==1.35.0  # AWS SDK for S3
 botocore==1.35.0  # AWS SDK core
-jinja2==3.1.4  # Templating engine for email templates

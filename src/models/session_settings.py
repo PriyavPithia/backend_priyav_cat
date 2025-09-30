@@ -37,7 +37,7 @@ class SessionSettings(Base):
     updated_by = Column(String, nullable=True)  # User ID who made the change
     
     def __repr__(self):
-        return f"<SessionSettings(timeout={self.session_timeout_seconds}s, session_mgmt={self.enable_session_management})>"
+        return f"<SessionSettings(timeout={self.session_timeout_minutes}min, debug_enabled={self.enable_debug_mode})>"
     
     @classmethod
     def get_or_create_default(cls, db):
@@ -55,20 +55,13 @@ class SessionSettings(Base):
             print(f"Error getting session settings: {str(e)}")
             return cls(
                 id="singleton",
-                session_timeout_seconds=420,
-                session_warning_seconds=300,
-                inactivity_threshold_seconds=120,
-                client_session_timeout_seconds=420,
-                client_session_warning_seconds=300,
-                client_inactivity_threshold_seconds=120,
-                adviser_session_timeout_seconds=150,
-                adviser_session_warning_seconds=120,
-                adviser_inactivity_threshold_seconds=30,
-                admin_session_timeout_seconds=100,
-                admin_session_warning_seconds=90,
-                admin_inactivity_threshold_seconds=10,
+                session_timeout_minutes=5,
+                session_timeout_test_seconds=30,
+                session_warning_seconds=60,
+                session_warning_test_seconds=10,
                 enable_session_management=True,
-                enable_session_debugger=True
+                enable_session_debugger=True,
+                enable_debug_mode=True
             )
     
     def get_settings_for_role(self, user_role):

@@ -8,11 +8,7 @@ import qrcode
 from io import BytesIO
 import base64
 from fastapi import Request
-try:
-    from ..config.settings import settings
-except ImportError:
-    # Fallback for when running as script
-    from config.settings import settings
+from ..config.settings import settings
 
 # Password hashing (use pbkdf2_sha256 to avoid platform bcrypt issues)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -28,13 +24,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def validate_password_strength(password: str) -> Dict[str, Any]:
     """
     Validate password meets requirements:
-    - Minimum 8 characters
+    - Minimum 10 characters
     - Contains uppercase, lowercase, and numbers
     """
     errors = []
     
-    if len(password) < 8:
-        errors.append("Password must be at least 8 characters long")
+    if len(password) < 10:
+        errors.append("Password must be at least 10 characters long")
     
     if not any(c.isupper() for c in password):
         errors.append("Password must contain at least one uppercase letter")

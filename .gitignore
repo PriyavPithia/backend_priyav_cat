@@ -1,14 +1,36 @@
-# Dependencies
-node_modules/
+# Virtual Environment
 venv/
 env/
+ENV/
 .venv/
-package-lock.json
-.pyc
-# Production builds
-dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
 # Environment variables
 .env
@@ -18,81 +40,6 @@ build/
 .env.production
 .env.example
 env.production.example
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-ca_tadley_debt_tool.db
-
-# Logs
-*.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# next.js build output
-.next
-
-# nuxt.js build output
-.nuxt
-
-# vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
 
 # IDE
 .vscode/
@@ -110,31 +57,20 @@ jspm_packages/
 ehthumbs.db
 Thumbs.db
 
-# Python
-__pycache__/
-*.py[cod]
-*.pyc
-*$py.class
-*.so
-.Python
-develop-eggs/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-.installed.cfg
-*.egg
-MANIFEST
+# Logs
+*.log
+logs/
+
+# Uploads (development)
+uploads/*
+!uploads/.gitkeep
 
 # Testing
+.coverage
 .pytest_cache/
-.tox/
 htmlcov/
+.tox/
+.cache
 nosetests.xml
 coverage.xml
 *.cover
@@ -173,7 +109,3 @@ celerybeat.pid
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-Scripts (Security)
-manage_tunnel.sh
-dev_start.sh

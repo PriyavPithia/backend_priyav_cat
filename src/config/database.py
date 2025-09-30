@@ -1,47 +1,26 @@
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-from sqlalchemy.exc import DisconnectionError
 from .settings import settings
-import logging
-import time
 
-logger = logging.getLogger(__name__)
+# Normalize DATABASE_URL for Postgres on managed platforms (e.g., Railway)
+database_url = settings.database_url
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+elif database_url.startswith("postgresql://") and "+" not in database_url:
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
-# Create database engine with enhanced connection handling
-is_sqlite = "sqlite" in settings.database_url
-print(settings.database_url)
-
-# PostgreSQL specific connection args for better stability
-postgres_connect_args = {
-    "connect_timeout": 10,
-    "application_name": "ca_tadley_debt_tool",
-    "keepalives_idle": 600,
-    "keepalives_interval": 30,
-    "keepalives_count": 3,
-} if not is_sqlite else {}
-
+# Create database engine with robust pooling
+is_sqlite = "sqlite" in database_url
 engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False} if is_sqlite else postgres_connect_args,
+    database_url,
+    connect_args={"check_same_thread": False} if is_sqlite else {},
     pool_pre_ping=True,
-    pool_recycle=1800,  # Recycle connections every 30 minutes
-    pool_size=3,  # Smaller pool for SSH tunnel stability
-    max_overflow=2,  # Limited overflow for tunnel constraints
-    pool_timeout=20,  # Shorter timeout to fail fast
-    echo=False,
-    poolclass=StaticPool if is_sqlite else None,
+    pool_recycle=1800,  # recycle connections every 30 minutes
+    pool_size=10 if not is_sqlite else 5,
+    max_overflow=20 if not is_sqlite else 10,
+    pool_timeout=10
 )
-
-# Add simple SQLite pragma listener if needed
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    """Set SQLite pragmas for better performance"""
-    if is_sqlite:
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -51,7 +30,6 @@ Base = declarative_base()
 
 # Database dependency
 def get_db():
-    """Get database session"""
     db = SessionLocal()
     try:
         yield db

@@ -5,7 +5,6 @@ import argparse
 from typing import List, Type
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 # Allow imports from src
@@ -50,10 +49,6 @@ def table_name(model: Type) -> str:
 
 
 def copy_table(src_session, dst_session, model: Type):
-    # Special handling for self-referential FK on users.invited_by_id
-    from src.models.user import User as UserModel  # local import to avoid circulars
-    if model is UserModel:
-        return copy_users_with_invited_by(src_session, dst_session)
     total_src = src_session.query(model).count()
     total_dst = dst_session.query(model).count()
     if total_src == 0:
@@ -87,22 +82,8 @@ def copy_table(src_session, dst_session, model: Type):
                 data[col.name] = getattr(row, col.name)
             clones.append(model(**data))
 
-        try:
-            dst_session.bulk_save_objects(clones, preserve_order=True)
-            dst_session.commit()
-        except IntegrityError as exc:
-            dst_session.rollback()
-            print(f"  ! bulk insert failed for {table_name(model)}: {exc.__class__.__name__}; trying row-by-row with FK checks…")
-            inserted = 0
-            for obj in clones:
-                try:
-                    dst_session.add(obj)
-                    dst_session.commit()
-                    inserted += 1
-                except IntegrityError:
-                    dst_session.rollback()
-                    # Skip rows that violate FKs or uniques
-            print(f"    - inserted {inserted}/{len(clones)} this batch via fallback")
+        dst_session.bulk_save_objects(clones, preserve_order=True)
+        dst_session.commit()
         offset += len(rows)
         print(f"  - inserted {offset}/{total_src}")
 
@@ -124,76 +105,6 @@ def enable_triggers_and_constraints(dst_engine):
             conn.execute(text("SET session_replication_role = 'origin';"))
         except Exception:
             pass
-
-
-def copy_users_with_invited_by(src_session, dst_session):
-    """Insert users in two phases to satisfy self-referential invited_by_id FK.
-
-    Phase 1: insert all users with invited_by_id set to NULL.
-    Phase 2: update invited_by_id to original values once all rows exist.
-    """
-    from src.models.user import User as UserModel
-
-    total_src = src_session.query(UserModel).count()
-    total_dst = dst_session.query(UserModel).count()
-    if total_src == 0:
-        print(f"- {table_name(UserModel)}: nothing to copy (source empty)")
-        return
-    if total_dst > 0:
-        print(f"! {table_name(UserModel)}: destination not empty ({total_dst} rows); skipping")
-        return
-
-    print(f"→ Copying {table_name(UserModel)} in two phases (rows: {total_src})…")
-
-    batch_size = 500
-    offset = 0
-    # Phase 1: insert with invited_by_id NULL
-    while True:
-        rows = (
-            src_session.query(UserModel)
-            .order_by(UserModel.__mapper__.primary_key[0])
-            .offset(offset)
-            .limit(batch_size)
-            .all()
-        )
-        if not rows:
-            break
-
-        clones = []
-        for row in rows:
-            data = {}
-            for col in UserModel.__table__.columns:
-                if col.name == "invited_by_id":
-                    data[col.name] = None
-                else:
-                    data[col.name] = getattr(row, col.name)
-            clones.append(UserModel(**data))
-
-        dst_session.bulk_save_objects(clones, preserve_order=True)
-        dst_session.commit()
-        offset += len(rows)
-        print(f"  - phase 1 inserted {offset}/{total_src}")
-
-    # Phase 2: update invited_by_id
-    print("  - phase 2 updating invited_by_id…")
-    # Build a list of (id, invited_by_id)
-    pairs = (
-        src_session.query(UserModel.id, UserModel.invited_by_id)
-        .filter(UserModel.invited_by_id.isnot(None))
-        .all()
-    )
-    from sqlalchemy import update
-    updated = 0
-    for user_id, inviter_id in pairs:
-        dst_session.execute(
-            update(UserModel).where(UserModel.id == user_id).values(invited_by_id=inviter_id)
-        )
-        updated += 1
-        if updated % 500 == 0:
-            dst_session.commit()
-    dst_session.commit()
-    print(f"  - phase 2 updated {updated} rows")
-    print(f"✓ {table_name(UserModel)} done")
 
 
 def main():

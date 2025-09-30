@@ -11,17 +11,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 # CSRF protection removed due to compatibility issues
 
-try:
-    from .config.settings import settings
-    from .config.logging import setup_logging, get_logger
-    from .models import create_tables
-    from .routes import auth, cases, admin, offices, client_details, profile, notifications, session_settings, files
-except ImportError:
-    # Fallback for when running as script
-    from config.settings import settings
-    from config.logging import setup_logging, get_logger
-    from models import create_tables
-    from routes import auth, cases, admin, offices, client_details, profile, notifications, session_settings, files
+from .config.settings import settings
+from .config.logging import setup_logging, get_logger
+from .models import create_tables
+from .routes import auth, cases, admin, offices, client_details, profile, notifications, session_settings, files
 # Import other routes as we create them
 
 # Initialize rate limiter
@@ -66,7 +59,11 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Security middleware
 if not settings.debug:
-    allowed_hosts = os.getenv("ALLOWED_HOSTS", "*.citizensadvicetadley.org.uk").split(",")
+    # Include Railway and your custom domains. Override via ALLOWED_HOSTS env in prod.
+    allowed_hosts = os.getenv(
+        "ALLOWED_HOSTS",
+        "*.citizensadvicetadley.org.uk,*.up.railway.app,web-production-dd1a.up.railway.app"
+    ).split(",")
     app.add_middleware(
         TrustedHostMiddleware, 
         allowed_hosts=allowed_hosts

@@ -36,14 +36,10 @@ class FileUpload(Base):
     # File details
     original_filename = Column(String(255), nullable=False)
     stored_filename = Column(String(255), nullable=False)  # UUID-based filename for security
-    file_path = Column(String(500), nullable=False)  # Local file path
+    file_path = Column(String(500), nullable=False)
     file_size = Column(Integer, nullable=False)  # Size in bytes
     file_extension = Column(String(10), nullable=False)
     mime_type = Column(String(100), nullable=False)
-    
-    # S3 Storage fields
-    s3_key = Column(String(500), nullable=True)  # S3 object key
-    storage_type = Column(String(10), default="local")  # "local", "s3", or "hybrid"
     
     # File categorization
     category = Column(Enum(FileCategory), nullable=False, default=FileCategory.OTHER)

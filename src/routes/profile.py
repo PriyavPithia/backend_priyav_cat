@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
+from passlib.context import CryptContext
 from ..config.database import get_db
 from ..models.user import User
 from ..models import Case, AuditLog
 from ..models.client_details import ClientDetails
 from datetime import datetime
 from .auth import get_current_user
-from ..utils.auth import hash_password, verify_password
 
 router = APIRouter()
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class ProfileUpdateRequest(BaseModel):
     first_name: str = None
@@ -83,41 +86,28 @@ async def change_password(
     db: Session = Depends(get_db)
 ):
     """Change user password"""
-    try:
-        # Validate new password first
-        if not request.new_password or len(request.new_password) < 8:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="New password must be at least 8 characters long"
-            )
-
-        # Verify current password
-        try:
-            if not current_user.password_hash or not verify_password(request.current_password, current_user.password_hash):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Current password is incorrect"
-                )
-        except Exception:
-            # Treat any verification error as incorrect password without leaking details
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect"
-            )
-
-        # Hash and update password
-        current_user.password_hash = hash_password(request.new_password)
-        db.commit()
-        return {"message": "Password changed successfully"}
-    except HTTPException:
-        # Pass through known errors
-        raise
-    except Exception as e:
-        db.rollback()
+    
+    # Verify current password
+    if not pwd_context.verify(request.current_password, current_user.password_hash):
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to change password"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
         )
+    
+    # Validate new password
+    if len(request.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 8 characters long"
+        )
+    
+    # Hash and update password
+    current_user.password_hash = pwd_context.hash(request.new_password)
+    
+    # Save changes
+    db.commit()
+    
+    return {"message": "Password changed successfully"}
 
 @router.get("/me")
 async def get_profile(
@@ -543,7 +533,6 @@ async def delete_my_case(
 
 @router.delete("/delete-account")
 async def delete_my_account(
-    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -575,29 +564,28 @@ async def delete_my_account(
     except Exception:
         db.rollback()
 
-    # Capture info before deletion
+    # Capture for response then delete user
     user_email = current_user.email
     user_id = current_user.id
-    office_id = current_user.office_id if hasattr(current_user, 'office_id') else None
 
     try:
-        # Create audit log BEFORE deletion
-        AuditLog.log_action(
-            db,
-            action="account_deleted",
-            user_id=user_id,
-            office_id=office_id,
-            resource_type="user",
-            resource_id=user_id,
-            description="Account deleted",
-            details=f"Account deleted: {user_email}",
-            ip_address=request.client.host if request and request.client else None
-        )
-        db.commit()  # Commit the audit log first
-
-        # Now delete the user
         db.delete(current_user)
-        db.commit()  # Commit the deletion separately
+        db.commit()
+
+        # Best-effort audit log (note: user_id reference preserved)
+        try:
+            audit_log = AuditLog(
+                user_id=user_id,
+                office_id=None if not hasattr(current_user, 'office_id') else current_user.office_id,
+                action="account_deleted",
+                resource_type="user",
+                resource_id=user_id,
+                details=f"User {user_email} deleted their account and all associated data"
+            )
+            db.add(audit_log)
+            db.commit()
+        except Exception:
+            db.rollback()
 
         return {"message": "Account deleted successfully"}
     except Exception as e:
